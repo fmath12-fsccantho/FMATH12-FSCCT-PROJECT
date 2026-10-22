@@ -5,11 +5,14 @@ import {
   Database, Library, ChevronLeft, ChevronRight, PlusCircle, Video, FileText,
   Cpu, Globe, Zap, AlertTriangle, CheckCircle2, Search, Settings, 
   Network, HardDrive, Edit3, Ban, Unlock, Trash2, Download, RefreshCcw,
-  X, Loader2, ShieldCheck, School, ArrowUpRight
+  X, Loader2, ShieldCheck, School, ArrowUpRight, Sparkles, Layers, ListChecks
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { supabase } from '../../config/supabase';
 import { getUserRoleBadgeInfo } from '../../utils/permissionUtils';
+import { examService } from '../../services/examService';
+import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
+import { AdminExamQuestionsModal } from '../../components/admin/AdminExamQuestionsModal';
 
 const AdminDashboard = () => {
   const { currentUser } = useAppStore();
@@ -17,7 +20,7 @@ const AdminDashboard = () => {
   
   // UI States
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'iam' | 'classes' | 'database' | 'content' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'iam' | 'exams' | 'classes' | 'database' | 'content' | 'settings'>('overview');
   const [connectionStatus, setConnectionStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('CONNECTING');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,10 +28,17 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState({ users: 0, teachers: 0, classes: 0, lessons: 0, exams: 0, attempts: 0 });
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   
-  // States cho Tab IAM & Classes
+  // States cho Tab IAM & Classes & Exams
   const [usersList, setUsersList] = useState<any[]>([]);
   const [classesList, setClassesList] = useState<any[]>([]);
+  const [examsList, setExamsList] = useState<any[]>([]);
   const [searchUser, setSearchUser] = useState("");
+  const [searchExam, setSearchExam] = useState("");
+  const [questionCountFilter, setQuestionCountFilter] = useState<'all' | '40' | '34' | '22' | 'under20' | 'empty'>('all');
+
+  // Modals Quản lý Câu hỏi & Phân tích AI
+  const [analysisModalExam, setAnalysisModalExam] = useState<any | null>(null);
+  const [manageQuestionsExam, setManageQuestionsExam] = useState<any | null>(null);
 
   // States cho Modal Đổi Vai trò
   const [roleModalUser, setRoleModalUser] = useState<any | null>(null);
@@ -76,6 +86,10 @@ const AdminDashboard = () => {
       // 4. Lấy Danh sách Lớp (cho Tab Classes)
       const { data: cls } = await supabase.from('classes').select('*, users(full_name), class_members(count)').order('created_at', { ascending: false });
       if (cls) setClassesList(cls);
+
+      // 5. Lấy Danh sách Đề thi & Quản lý số lượng câu hỏi
+      const examsData = await examService.getManagementExams(currentUser);
+      if (examsData) setExamsList(examsData);
 
     } catch (error) {
       console.error("Lỗi lấy dữ liệu Admin:", error);
@@ -169,9 +183,25 @@ const AdminDashboard = () => {
     (u.email || '').toLowerCase().includes(searchUser.toLowerCase())
   );
 
+  const filteredExams = examsList.filter(e => {
+    const matchesSearch = (e.title || '').toLowerCase().includes(searchExam.toLowerCase()) || 
+                          (e.author?.full_name || '').toLowerCase().includes(searchExam.toLowerCase()) || 
+                          (e.group_name || '').toLowerCase().includes(searchExam.toLowerCase());
+    const count = e.questionsCount || 0;
+    if (questionCountFilter === '40') return matchesSearch && count === 40;
+    if (questionCountFilter === '34') return matchesSearch && count === 34;
+    if (questionCountFilter === '22') return matchesSearch && count === 22;
+    if (questionCountFilter === 'under20') return matchesSearch && count > 0 && count < 20;
+    if (questionCountFilter === 'empty') return matchesSearch && count === 0;
+    return matchesSearch;
+  });
+
+  const totalQuestionsInSystem = examsList.reduce((acc, e) => acc + (e.questionsCount || 0), 0);
+
   const internalMenu = [
     { id: 'overview', icon: <Activity size={18}/>, label: 'Tổng quan Hệ thống' },
     { id: 'iam', icon: <Users size={18}/>, label: 'Định danh (IAM)' },
+    { id: 'exams', icon: <Layers size={18}/>, label: 'Đề thi & Số lượng câu' },
     { id: 'content', icon: <BookOpen size={18}/>, label: 'Quản lý Bài đăng' },
     { id: 'classes', icon: <Network size={18}/>, label: 'Phiên Lớp học' },
     { id: 'database', icon: <Database size={18}/>, label: 'Cơ sở Dữ liệu' },
@@ -395,6 +425,8 @@ const AdminDashboard = () => {
               </div>
             )}
 
+
+
             {/* ========================================================= */}
             {/* TAB 2: IAM (QUẢN LÝ TÀI KHOẢN) */}
             {/* ========================================================= */}
@@ -495,6 +527,225 @@ const AdminDashboard = () => {
             )}
 
             {/* ========================================================= */}
+            {/* TAB 2.5: EXAMS & QUESTION COUNT MANAGEMENT (ADMIN QUẢN LÝ) */}
+            {/* ========================================================= */}
+            {activeTab === 'exams' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white font-heading flex items-center gap-2 m-0">
+                      <Library className="text-primary" size={22}/> Quản Lý Đề Thi & Số Lượng Câu Hỏi
+                    </h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Admin toàn quyền giám sát số lượng câu hỏi trong từng đề thi, điều chỉnh cấu trúc ma trận câu hỏi và phân tích toàn bộ đề bằng AI siêu tốc.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => navigate('/exam-creator')}
+                      className="btn-secondary py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 font-bold cursor-pointer"
+                    >
+                      <PlusCircle size={14} /> Ghép đề từ Kho
+                    </button>
+                    <button 
+                      onClick={() => navigate('/exam-editor')}
+                      className="btn-primary py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 font-bold cursor-pointer"
+                    >
+                      <PlusCircle size={14} /> Soạn đề mới
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Thẻ chỉ số tổng quan số câu */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tổng số đề thi</div>
+                    <div className="text-2xl font-black font-heading text-slate-900 dark:text-white mt-1">
+                      {examsList.length} <span className="text-xs font-semibold text-slate-400">bộ đề</span>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tổng số câu hỏi trong đề</div>
+                    <div className="text-2xl font-black font-heading text-blue-600 dark:text-blue-400 mt-1">
+                      {totalQuestionsInSystem} <span className="text-xs font-semibold text-slate-400">câu hỏi</span>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Đề chuẩn Bộ 2026 (22/34 câu)</div>
+                    <div className="text-2xl font-black font-heading text-emerald-600 dark:text-emerald-400 mt-1">
+                      {examsList.filter(e => e.questionsCount === 22 || e.questionsCount === 34).length} <span className="text-xs font-semibold text-slate-400">đề</span>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Đề truyền thống (40 câu)</div>
+                    <div className="text-2xl font-black font-heading text-indigo-600 dark:text-indigo-400 mt-1">
+                      {examsList.filter(e => e.questionsCount === 40).length} <span className="text-xs font-semibold text-slate-400">đề</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bảng danh sách đề & bộ lọc số lượng câu */}
+                <div className="flat-card flex flex-col h-[550px] overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    
+                    {/* Tìm kiếm */}
+                    <div className="relative max-w-sm w-full">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15}/>
+                      <input 
+                        type="text" 
+                        placeholder="Tìm kiếm Tên đề thi, Nhóm hoặc Tác giả..." 
+                        value={searchExam} 
+                        onChange={e => setSearchExam(e.target.value)} 
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 outline-none focus:border-primary text-xs text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Bộ lọc theo số lượng câu */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                      <span className="text-slate-400 text-[11px] mr-1 hidden sm:inline">Lọc số câu:</span>
+                      <button 
+                        onClick={() => setQuestionCountFilter('all')}
+                        className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === 'all' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        Tất cả ({examsList.length})
+                      </button>
+                      <button 
+                        onClick={() => setQuestionCountFilter('40')}
+                        className={`px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === '40' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        40 câu ({examsList.filter(e => e.questionsCount === 40).length})
+                      </button>
+                      <button 
+                        onClick={() => setQuestionCountFilter('34')}
+                        className={`px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === '34' ? 'bg-emerald-600 text-white' : 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        34 câu ({examsList.filter(e => e.questionsCount === 34).length})
+                      </button>
+                      <button 
+                        onClick={() => setQuestionCountFilter('22')}
+                        className={`px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === '22' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        22 câu ({examsList.filter(e => e.questionsCount === 22).length})
+                      </button>
+                      <button 
+                        onClick={() => setQuestionCountFilter('under20')}
+                        className={`px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === 'under20' ? 'bg-amber-600 text-white' : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        &lt;20 câu ({examsList.filter(e => (e.questionsCount || 0) > 0 && (e.questionsCount || 0) < 20).length})
+                      </button>
+                      <button 
+                        onClick={() => setQuestionCountFilter('empty')}
+                        className={`px-2 py-1 rounded-lg transition-colors cursor-pointer text-[11px] ${questionCountFilter === 'empty' ? 'bg-rose-600 text-white' : 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 border border-slate-200 dark:border-slate-700'}`}
+                      >
+                        0 câu ({examsList.filter(e => !e.questionsCount || e.questionsCount === 0).length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bảng danh sách đề thi */}
+                  <div className="flex-1 overflow-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[850px]">
+                      <thead className="bg-slate-50 dark:bg-slate-850 sticky top-0 z-10 shadow-2xs border-b border-slate-200 dark:border-slate-800">
+                        <tr className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          <th className="p-4">Tên Đề thi & Nhóm</th>
+                          <th className="p-4">Tác giả / Nguồn</th>
+                          <th className="p-4 text-center">Số lượng Câu hỏi</th>
+                          <th className="p-4 text-center">Thời gian</th>
+                          <th className="p-4 text-right">Thao tác Quản trị</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredExams.map((exam) => {
+                          const qCount = exam.questionsCount || 0;
+                          const qCountBadge = qCount === 40 
+                            ? 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300' 
+                            : qCount === 34 || qCount === 22
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                            : qCount === 0
+                            ? 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950 dark:text-rose-300'
+                            : 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300';
+
+                          return (
+                            <tr key={exam.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-850/60 transition-colors">
+                              <td className="p-4">
+                                <div className="font-bold text-slate-900 dark:text-white text-sm line-clamp-1" title={exam.title}>
+                                  {exam.title}
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                                  <span>{exam.group_name || 'Khác'}</span>
+                                  <span>•</span>
+                                  <span className="capitalize">{exam.type || 'Đề luyện thi'}</span>
+                                </div>
+                              </td>
+
+                              <td className="p-4">
+                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                  {exam.author?.full_name || 'Hệ thống FMATH12'}
+                                </div>
+                                {exam.author?.school && (
+                                  <div className="text-[10px] text-slate-400">{exam.author.school}</div>
+                                )}
+                              </td>
+
+                              {/* SỐ LƯỢNG CÂU HỎI TRONG ĐỀ */}
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => setManageQuestionsExam(exam)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border transition-transform hover:scale-105 cursor-pointer ${qCountBadge}`}
+                                  title="Bấm để xem và quản lý danh sách câu hỏi của đề này"
+                                >
+                                  <Layers size={13} />
+                                  <span>{qCount} câu</span>
+                                </button>
+                              </td>
+
+                              <td className="p-4 text-center text-xs font-medium text-slate-600 dark:text-slate-300">
+                                {Math.floor((exam.time_limit || 2700) / 60)} phút
+                              </td>
+
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Nút 1: Phân tích tất cả câu hỏi AI Siêu tốc */}
+                                  <button
+                                    onClick={() => setAnalysisModalExam(exam)}
+                                    className="p-1.5 px-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                                    title="Phân tích toàn bộ câu hỏi trong đề này bằng AI siêu tốc"
+                                  >
+                                    <Sparkles size={12} className="text-sky-200 animate-pulse" /> Phân tích AI
+                                  </button>
+
+                                  {/* Nút 2: Quản lý số câu hỏi */}
+                                  <button
+                                    onClick={() => setManageQuestionsExam(exam)}
+                                    className="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer text-xs flex items-center gap-1"
+                                    title="Quản lý / Điều chỉnh số lượng câu hỏi"
+                                  >
+                                    <ListChecks size={13} /> Quản lý câu
+                                  </button>
+
+                                  {/* Nút 3: Biên tập đề */}
+                                  <button
+                                    onClick={() => navigate('/exam-editor', { state: { examId: exam.id } })}
+                                    className="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                                    title="Soạn & Sửa đề thi"
+                                  >
+                                    <Edit3 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+
+            {/* ========================================================= */}
             {/* TAB 3: CLASSES (QUẢN LÝ LỚP HỌC) */}
             {/* ========================================================= */}
             {activeTab === 'classes' && (
@@ -581,6 +832,8 @@ const AdminDashboard = () => {
               </div>
             )}
 
+
+
             {/* ========================================================= */}
             {/* TAB 4: DATABASE & ARCHITECTURE */}
             {/* ========================================================= */}
@@ -609,6 +862,8 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+
+
 
             {/* ========================================================= */}
             {/* TAB 5: CONTENT (QUẢN LÝ BÀI ĐĂNG) */}
@@ -676,6 +931,8 @@ const AdminDashboard = () => {
               </div>
             )}
 
+
+
             {/* ========================================================= */}
             {/* TAB 6: SETTINGS */}
             {/* ========================================================= */}
@@ -711,6 +968,8 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+
+
 
           </div>
         </div>
@@ -781,6 +1040,8 @@ const AdminDashboard = () => {
               </div>
             )}
 
+
+
             <div className="flex gap-3 pt-2">
               <button 
                 onClick={() => setRoleModalUser(null)} 
@@ -798,6 +1059,31 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+    
+      {/* MODAL PHÂN TÍCH TOÀN BỘ CÂU HỎI BẰNG AI */}
+      {analysisModalExam && (
+        <ExamBatchAnalysisModal
+          isOpen={Boolean(analysisModalExam)}
+          onClose={() => setAnalysisModalExam(null)}
+          examTitle={analysisModalExam.title}
+          examId={analysisModalExam.id}
+        />
+      )}
+
+      {/* MODAL QUẢN LÝ SỐ LƯỢNG CÂU HỎI TRONG ĐỀ */}
+      {manageQuestionsExam && (
+        <AdminExamQuestionsModal
+          isOpen={Boolean(manageQuestionsExam)}
+          onClose={() => setManageQuestionsExam(null)}
+          exam={manageQuestionsExam}
+          onQuestionsUpdated={fetchAllData}
+          onOpenAnalysis={(exam) => {
+            setManageQuestionsExam(null);
+            setAnalysisModalExam(exam);
+          }}
+        />
       )}
 
     </div>

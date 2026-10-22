@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import DashboardLayout from './components/layout/DashboardLayout';
 
 const LandingPage = lazy(() => import('./pages/common/LandingPage'));
@@ -58,9 +58,24 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 );
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [pathname]);
+
+  return null;
+};
+
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Suspense fallback={<FullPageLoading />}><LandingPage /></Suspense>} />
         <Route path="/login" element={<Suspense fallback={<FullPageLoading />}><LoginPage /></Suspense>} />

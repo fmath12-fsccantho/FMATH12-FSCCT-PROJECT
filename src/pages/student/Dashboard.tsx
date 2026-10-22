@@ -4,7 +4,7 @@ import { Trophy, Flame, TrendingUp, BookOpen, Target, Zap, ArrowRight, BrainCirc
 
 const Dashboard = () => {
   const { currentUser } = useAppStore();
-  const [greeting, setGreeting] = useState('');
+  const [greeting, setGreeting] = useState('Xin chào');
 
   useEffect(() => {
     const hour = new Date().getHours();

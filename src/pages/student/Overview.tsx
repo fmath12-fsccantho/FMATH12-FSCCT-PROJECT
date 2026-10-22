@@ -24,7 +24,16 @@ import { MathGraphPlotter } from '../../components/common/MathGraphPlotter';
 const Dashboard = () => {
   const { currentUser } = useAppStore();
   const navigate = useNavigate();
-  const [greeting, setGreeting] = useState('');
+  const [greeting, setGreeting] = useState('Xin chào');
+  
+  // Tự động cuộn lên đầu trang khi truy cập trang Tổng quan
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, []);
   
   const [chapters, setChapters] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
@@ -76,13 +85,17 @@ const Dashboard = () => {
   const [topicAiAnalysis, setTopicAiAnalysis] = useState<string>('');
   const [isAnalyzingTopic, setIsAnalyzingTopic] = useState<boolean>(false);
 
-  // Tự động cuộn xuống cuối khung chat AI Tutor
+  // Tự động cuộn xuống cuối khung chat AI Tutor khi có tin nhắn mới hoặc đang trả lời
   useEffect(() => {
-    tutorChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (tutorChatHistory.length > 0 || isTutorReplying) {
+      tutorChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [tutorChatHistory, isTutorReplying]);
 
   useEffect(() => {
-    diagnosticChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (diagnosticChatHistory.length > 0 || isDiagnosticReplying) {
+      diagnosticChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [diagnosticChatHistory, isDiagnosticReplying]);
   // Component tùy biến render Markdown và đồ họa SVG sắc nét từ FMATH12 AI
   const SvgMarkdownComponents = useMemo(() => ({
@@ -674,7 +687,7 @@ YÊU CẦU NỘI DUNG PHÂN TÍCH:
                 </div>
                 
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-heading text-white tracking-tight leading-tight m-0">
-                  {greeting}, {currentUser.name ? currentUser.name.split(' ').pop() : 'Bạn'}! 👋
+                  {greeting || 'Xin chào'}, {currentUser.name ? currentUser.name.split(' ').pop() : 'Bạn'}! 👋
                 </h1>
                 
                 <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-300 font-sans pt-1">

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { examService } from '../../services/examService';
+import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
 
 const QuizDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ const QuizDetail = () => {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -183,14 +185,22 @@ const QuizDetail = () => {
               </div>
             </div>
 
-            {/* Start Button */}
-            <div className="pt-2">
+            {/* Start Button & Phân tích AI Button */}
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 onClick={handleStartQuiz}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold font-heading text-sm shadow-xl shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer"
               >
                 <PlayCircle size={18} />
                 <span>{history.length > 0 ? 'Bắt đầu làm lại đề' : 'Bắt đầu làm bài ngay'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowAnalysisModal(true)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 text-indigo-700 dark:text-indigo-300 font-bold font-heading text-sm shadow-sm active:scale-95 transition-all cursor-pointer"
+              >
+                <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400 animate-pulse" />
+                <span>Phân tích ma trận đề (AI)</span>
               </button>
             </div>
           </div>
@@ -317,6 +327,16 @@ const QuizDetail = () => {
 
         </div>
       </div>
+
+      {/* MODAL PHÂN TÍCH MA TRẬN ĐỀ THI BẰNG AI */}
+      {showAnalysisModal && exam && (
+        <ExamBatchAnalysisModal
+          isOpen={showAnalysisModal}
+          onClose={() => setShowAnalysisModal(false)}
+          examTitle={exam.title}
+          examId={exam.id}
+        />
+      )}
     </div>
   );
 };

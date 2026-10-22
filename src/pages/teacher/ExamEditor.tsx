@@ -4,7 +4,7 @@ import {
   ArrowLeft, Save, Image as ImageIcon, Loader2, 
   SplitSquareHorizontal, FileQuestion, Clock, 
   Copy, Check, CheckCircle2, AlertCircle,
-  BrainCircuit, Edit3, Database
+  BrainCircuit, Edit3, Database, Sparkles
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -14,6 +14,7 @@ import 'katex/dist/katex.min.css';
 import { supabase } from '../../config/supabase';
 import { useAppStore } from '../../store/useAppStore';
 import { canEditExam, isFptTeacherOrAdmin, canApproveExam } from '../../utils/permissionUtils';
+import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
 
 const AI_PROMPT = `Bạn là một chuyên gia Toán học và kỹ sư dữ liệu. 
 Nhiệm vụ: Đọc đề thi dưới đây. ĐẶC BIỆT LƯU Ý: Giáo viên đã cung cấp sẵn đáp án đúng trong đề (bằng cách gạch chân, in đậm, bôi đỏ, có dấu * ở phương án đúng, hoặc để bảng đáp án ở cuối file). 
@@ -148,6 +149,7 @@ const ExamEditor = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isJsonCopied, setIsJsonCopied] = useState(false);
+  const [showBatchAnalysisModal, setShowBatchAnalysisModal] = useState(false);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>(null);
@@ -327,6 +329,21 @@ const ExamEditor = () => {
     navigator.clipboard.writeText(jsonString);
     setIsJsonCopied(true);
     setTimeout(() => setIsJsonCopied(false), 2000);
+  };
+
+  const handleApplyAnalysis = (results: any[]) => {
+    if (!parsedData || !results) return;
+    const updated = parsedData.map((q, idx) => {
+      const res = results[idx];
+      if (!res) return q;
+      return {
+        ...q,
+        level: res.level || q.level,
+        topic: res.topic || q.topic,
+        subTopic: res.subTopic || q.subTopic
+      };
+    });
+    setParsedData(updated);
   };
 
   const handleSaveInlineEdit = async () => {
@@ -670,6 +687,16 @@ const ExamEditor = () => {
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setShowBatchAnalysisModal(true)}
+            disabled={!parsedData || parsedData.length === 0}
+            className="py-2.5 px-4 text-[13px] flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-lg shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+            title="Phân tích toàn bộ câu hỏi trong đề thi bằng AI siêu tốc"
+          >
+            <Sparkles size={15} className="text-sky-200 animate-pulse" />
+            <span>Phân tích đề (AI)</span>
+          </button>
+
           <button
             onClick={handleCopyJSON}
             disabled={!parsedData || parsedData.length === 0}
@@ -1066,6 +1093,15 @@ const ExamEditor = () => {
           )}
         </div>
       </div>
+
+      {/* MODAL PHÂN TÍCH TOÀN BỘ CÂU HỎI TRONG ĐỀ THI */}
+      <ExamBatchAnalysisModal
+        isOpen={showBatchAnalysisModal}
+        onClose={() => setShowBatchAnalysisModal(false)}
+        examTitle={title || 'Đề thi'}
+        questions={parsedData || []}
+        onApplyAnalysis={handleApplyAnalysis}
+      />
     </div>
   );
 };

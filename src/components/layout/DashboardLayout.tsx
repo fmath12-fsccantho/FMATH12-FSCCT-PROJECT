@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -27,6 +27,15 @@ const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const location = useLocation();
+  const mainScrollRef = useRef<HTMLElement>(null);
+
+  // Tự động kéo lên trên đầu trang khi truy cập hoặc chuyển trang
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
   const hideMenu = location.pathname.includes('/live-exam') || 
                    location.pathname.includes('/live-monitor') ||
                    location.search.includes('embed=true');
@@ -172,7 +181,7 @@ const DashboardLayout = () => {
             onMenuClick={() => setSidebarOpen(true)}
           />
         )}
-        <main className="flex-1 relative overflow-y-auto custom-scrollbar pb-20 md:pb-0">
+        <main ref={mainScrollRef} className="flex-1 relative overflow-y-auto custom-scrollbar pb-20 md:pb-0">
           <Suspense fallback={<PageContentLoading />}>
             <Outlet />
           </Suspense>

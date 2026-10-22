@@ -5,7 +5,8 @@ import {
   Save, CalendarClock, History, LayoutTemplate, ListChecks, 
   Folder, ChevronDown, ChevronRight, Copy, ShieldCheck, Award, 
   Globe, Search, Sparkles, AlertCircle, CheckCircle2, Filter,
-  CheckCircle, XCircle, Clock4, FileCheck, ThumbsUp, ThumbsDown
+  CheckCircle, XCircle, Clock4, FileCheck, ThumbsUp, ThumbsDown,
+  Layers
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
@@ -19,6 +20,7 @@ import {
   canApproveExam
 } from '../../utils/permissionUtils';
 import ManagementHeader from '../../components/common/ManagementHeader';
+import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
 
 const ExamBank = () => {
   const { currentUser } = useAppStore();
@@ -31,6 +33,7 @@ const ExamBank = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<'all' | 'official' | 'mine'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'rejected'>('all');
+  const [analysisModalExam, setAnalysisModalExam] = useState<any | null>(null);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedExam, setSelectedExam] = useState<any>(null);
@@ -626,6 +629,16 @@ const ExamBank = () => {
 
                                     {/* Action buttons góc trên */}
                                     <div className="flex items-center gap-1">
+                                      {/* Nút Phân tích AI toàn bộ câu hỏi đề thi */}
+                                      <button 
+                                        onClick={() => setAnalysisModalExam(exam)} 
+                                        className="p-1 px-1.5 text-indigo-600 dark:text-indigo-400 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold border border-indigo-200/80 dark:border-indigo-800" 
+                                        title="Phân tích toàn bộ câu hỏi đề thi bằng AI siêu tốc"
+                                      >
+                                        <Sparkles size={12} className="animate-pulse" />
+                                        <span>Phân tích</span>
+                                      </button>
+
                                       {/* Nút Sửa nội dung câu hỏi */}
                                       {canEdit ? (
                                         <button 
@@ -690,6 +703,12 @@ const ExamBank = () => {
                                 </div>
 
                                 <div className="space-y-1.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5"><Layers size={13}/> Số câu hỏi</span>
+                                    <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md text-[11px]">
+                                      {exam.questionsCount || 0} câu
+                                    </span>
+                                  </div>
                                   <div className="flex items-center justify-between">
                                     <span className="flex items-center gap-1.5"><Clock size={13}/> Thời gian</span>
                                     <span className="font-bold text-slate-800 dark:text-slate-200">{Math.floor((exam.time_limit || 2700)/60)} phút</span>
@@ -994,6 +1013,16 @@ const ExamBank = () => {
 
           </div>
         </div>
+      )}
+
+      {/* MODAL PHÂN TÍCH TOÀN BỘ CÂU HỎI ĐỀ THI BẰNG AI SIÊU TỐC */}
+      {analysisModalExam && (
+        <ExamBatchAnalysisModal
+          isOpen={Boolean(analysisModalExam)}
+          onClose={() => setAnalysisModalExam(null)}
+          examTitle={analysisModalExam.title}
+          examId={analysisModalExam.id}
+        />
       )}
 
     </div>
