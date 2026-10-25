@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import { useAppStore } from '../../store/useAppStore';
 import { courseService } from '../../services/courseService';
@@ -283,10 +284,13 @@ ${tierGuide}
     // 3. Tự động phục hồi thẻ ảnh markdown chuẩn cho các link ảnh Cloudinary hợp lệ (kể cả khi bị trần hoặc dính dấu ngoặc cuối)
     cleaned = cleaned.replace(/(?<!\()https?:\/\/(res\.cloudinary\.com\/[^\s)]+\.(?:png|jpg|jpeg|webp))\)?/gi, '\n\n![Hình ảnh minh họa](https://$1)\n\n');
     
-    // 4. TỰ ĐỘNG CHUYỂN ĐỔI CÔNG THỨC NGOẶC VUÔNG VÀ TOÀN BỘ CÔNG THỨC LATEX VỀ CHUẨN KATEX
+    // 4. Chuẩn hóa thẻ <br> thành <br/> để rehype-raw render mượt mà
+    cleaned = cleaned.replace(/<br\s*\/?>/gi, '<br/>');
+
+    // 5. TỰ ĐỘNG CHUYỂN ĐỔI CÔNG THỨC NGOẶC VUÔNG VÀ TOÀN BỘ CÔNG THỨC LATEX VỀ CHUẨN KATEX
     cleaned = formatMathAndSteps(cleaned);
 
-    // 5. Dọn các dòng trích dẫn rỗng sau khi xóa ảnh
+    // 6. Dọn các dòng trích dẫn rỗng sau khi xóa ảnh
     cleaned = cleaned.replace(/^\s*>\s*$/gm, '');
     return cleaned.trim();
   };
@@ -545,9 +549,38 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
       </div>
     ),
     table: ({ node, ...props }: any) => (
-      <div className="my-6 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-        <table className="w-full text-left border-collapse text-sm" {...props} />
+      <div className="my-8 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse text-[14px]" {...props} />
+        </div>
       </div>
+    ),
+    thead: ({ node, ...props }: any) => (
+      <thead className="bg-gradient-to-r from-slate-100 via-indigo-50/50 to-slate-100 dark:from-slate-800 dark:via-slate-850 dark:to-slate-800 border-b-2 border-indigo-200/80 dark:border-indigo-900/60" {...props} />
+    ),
+    tbody: ({ node, ...props }: any) => (
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80" {...props} />
+    ),
+    tr: ({ node, ...props }: any) => (
+      <tr className="hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-colors even:bg-slate-50/60 dark:even:bg-slate-850/30" {...props} />
+    ),
+    th: ({ node, ...props }: any) => (
+      <th className="py-4 px-4 sm:px-5 font-black text-slate-800 dark:text-slate-100 font-heading text-xs tracking-wider uppercase whitespace-nowrap first:text-center first:w-16" {...props} />
+    ),
+    td: ({ node, ...props }: any) => (
+      <td className="py-4 px-4 sm:px-5 text-slate-750 dark:text-slate-200 leading-relaxed align-top first:text-center first:font-bold first:text-indigo-600 dark:first:text-indigo-400" {...props} />
+    ),
+    ul: ({ node, ...props }: any) => (
+      <ul className="my-2 space-y-2.5 list-none p-0 m-0" {...props} />
+    ),
+    ol: ({ node, ...props }: any) => (
+      <ol className="my-2 space-y-2 list-decimal pl-5 marker:font-bold marker:text-indigo-600" {...props} />
+    ),
+    li: ({ node, ...props }: any) => (
+      <li className="relative pl-5 py-0.5 leading-relaxed before:content-['•'] before:absolute before:left-1 before:top-0 before:text-indigo-600 dark:before:text-indigo-400 before:font-bold before:text-base" {...props} />
+    ),
+    br: ({ node, ...props }: any) => (
+      <span className="block my-2" {...props} />
     ),
     code: ({ node, inline, className, children, ...props }: any) => {
       const text = String(children || '').trim();
@@ -596,13 +629,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
           {children}
         </code>
       );
-    },
-    th: ({ node, ...props }: any) => (
-      <th className="bg-slate-100 dark:bg-slate-800 p-3 font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 font-heading" {...props} />
-    ),
-    td: ({ node, ...props }: any) => (
-      <td className="p-3 border-b border-slate-100 dark:border-slate-800/60 text-slate-700 dark:text-slate-300" {...props} />
-    )
+    }
   };
 
   // Làm sạch văn bản để loại bỏ tiêu đề bị lặp nhiều lần ở đầu file và các ảnh lỗi
@@ -629,7 +656,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
     return (
       <ReactMarkdown 
         remarkPlugins={[remarkMath, remarkGfm]} 
-        rehypePlugins={[rehypeKatex]} 
+        rehypePlugins={[rehypeRaw, rehypeKatex]} 
         components={MarkdownComponents}
       >
         {cleanedTheoryContent}
@@ -1251,7 +1278,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
                         <div className="prose prose-blue dark:prose-invert max-w-none text-[15px] leading-relaxed">
                           <ReactMarkdown
                             remarkPlugins={[remarkMath, remarkGfm]}
-                            rehypePlugins={[rehypeKatex]}
+                            rehypePlugins={[rehypeRaw, rehypeKatex]}
                             components={MarkdownComponents}
                           >
                             {sanitizeAiMarkdown(tierAiContent[activeScaffoldingTier]) || `Đang chuẩn bị nội dung Bậc ${activeScaffoldingTier}...`}
@@ -1349,7 +1376,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
                                   <div className="prose prose-xs dark:prose-invert max-w-none">
                                     <ReactMarkdown
                                       remarkPlugins={[remarkMath, remarkGfm]}
-                                      rehypePlugins={[rehypeKatex]}
+                                      rehypePlugins={[rehypeRaw, rehypeKatex]}
                                       components={MarkdownComponents}
                                     >
                                       {sanitizeAiMarkdown(msg.content)}
@@ -1460,7 +1487,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
 
                       {/* Nội dung câu hỏi */}
                       <div className="prose prose-base max-w-none text-slate-900 dark:text-white text-[15px] leading-relaxed">
-                        <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
+                        <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={MarkdownComponents}>
                           {currentExercise.content}
                         </ReactMarkdown>
                       </div>
@@ -1491,7 +1518,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
                               return (
                                 <div key={optId} onClick={() => { if(!isSubmitted) handleAnswerMCQ(optId) }} className={`w-full text-left p-3.5 rounded-xl border transition-colors flex items-start gap-3 cursor-pointer ${optionClass}`}>
                                   <div className={`w-7 h-7 mt-0.5 shrink-0 rounded-full flex items-center justify-center font-bold text-[12px] font-ui ${isSubmitted && isCorrect ? 'bg-emerald-600 text-white' : isSubmitted && isSelected && !isCorrect ? 'bg-rose-600 text-white' : isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{displayId}</div>
-                                  <div className="prose prose-sm flex-1 text-[14px] leading-relaxed overflow-x-auto m-0 pt-1"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
+                                  <div className="prose prose-sm flex-1 text-[14px] leading-relaxed overflow-x-auto m-0 pt-1"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
                                   {isSubmitted && isCorrect && <CheckCircle2 className="text-emerald-600 shrink-0 mt-1" size={20}/>}
                                   {isSubmitted && isSelected && !isCorrect && <XCircle className="text-rose-600 shrink-0 mt-1" size={20}/>}
                                 </div>
@@ -1516,7 +1543,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
                                 <div key={optId} className={`p-3.5 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors ${isSubmitted ? (isUserCorrect ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300' : 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300') : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850'}`}>
                                   <div className="flex items-start gap-3 flex-1 overflow-x-auto">
                                     <div className="w-6 h-6 mt-0.5 shrink-0 rounded flex items-center justify-center font-bold text-[12px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-ui">{rawOptId}</div>
-                                    <div className="prose prose-sm m-0 text-[14px] text-slate-800 dark:text-slate-200"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
+                                    <div className="prose prose-sm m-0 text-[14px] text-slate-800 dark:text-slate-200"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0 self-end md:self-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                                     <button disabled={isSubmitted} onClick={() => handleAnswerTF(optId, true)} className={`px-4 py-1.5 rounded-lg font-semibold text-[13px] transition-colors cursor-pointer ${userVal === true ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>Đúng</button>
@@ -1658,7 +1685,7 @@ Hãy trả lời ân cần, sư phạm, dẫn dắt học sinh tự hiểu bản
                 <div className={`max-w-[85%] rounded-2xl p-3 text-[13px] leading-relaxed ${msg.role === 'user' ? 'bg-blue-600 text-white font-medium rounded-br-sm' : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-bl-sm'}`}>
                   {msg.role === 'user' ? msg.content : (
                     <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1">
-                      <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
+                      <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeRaw, rehypeKatex]} components={MarkdownComponents}>
                         {sanitizeAiMarkdown(msg.content)}
                       </ReactMarkdown>
                     </div>

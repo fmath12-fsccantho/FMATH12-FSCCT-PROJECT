@@ -1465,13 +1465,11 @@ YÊU CẦU NỘI DUNG PHÂN TÍCH:
                           <td className="py-3 px-3 text-right whitespace-nowrap">
                             <button
                               onClick={() => {
-                                if (att.exam_id) {
-                                  navigate(`/quiz/${att.exam_id}`);
-                                } else {
-                                  navigate('/quiz');
-                                }
+                                const targetExamId = att.exam_id || 'sys-exam-bgd-2026-01';
+                                navigate(`/quiz/${targetExamId}/take?review=true&attemptId=${att.id || ''}`);
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] transition-colors inline-flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-105"
+                              title="Bấm để mở phòng xem lại toàn bộ đề thi, đáp án đúng và lời giải chi tiết từng bước"
                             >
                               <FileText size={12} /> Xem lời giải chi tiết &rarr;
                             </button>

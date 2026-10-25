@@ -311,11 +311,20 @@ const QuizDetail = () => {
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-sm font-black font-raleway text-indigo-600 dark:text-indigo-400">
-                          {att.score}
-                        </span>
-                        <span className="text-[9.5px] uppercase font-bold text-slate-400 block font-heading">Điểm</span>
+                      <div className="text-right flex items-center gap-2.5">
+                        <div>
+                          <span className="text-sm font-black font-raleway text-indigo-600 dark:text-indigo-400">
+                            {att.score}
+                          </span>
+                          <span className="text-[9.5px] uppercase font-bold text-slate-400 block font-heading">Điểm</span>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/quiz/${exam.id}/take?review=true&attemptId=${att.id}`)}
+                          className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          title="Xem lại chi tiết bài làm và lời giải"
+                        >
+                          Xem lời giải
+                        </button>
                       </div>
                     </div>
                   ))}
