@@ -6,7 +6,7 @@ import {
   Cpu, Globe, Zap, AlertTriangle, CheckCircle2, Search, Settings, 
   Network, HardDrive, Edit3, Ban, Unlock, Trash2, Download, RefreshCcw,
   X, Loader2, ShieldCheck, School, ArrowUpRight, Sparkles, Layers, ListChecks,
-  BarChart3
+  BarChart3, Lock
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { supabase } from '../../config/supabase';

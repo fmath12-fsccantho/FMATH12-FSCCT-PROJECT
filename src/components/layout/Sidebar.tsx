@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, BookOpen, PenTool, Trophy, 
   User, Users, LogOut, ShieldCheck, Database, Library, Shield, Video, FolderOpen, X, Sparkles, Flame, Cpu, Activity,
-  BarChart3, ExternalLink, Award, FileText
+  BarChart3, ExternalLink, Award, FileText, CheckCircle2
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { signOut } from 'firebase/auth';
