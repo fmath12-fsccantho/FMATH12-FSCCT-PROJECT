@@ -348,7 +348,8 @@ def run_server():
             pass
 
     server_address = (HOST, PORT)
-    # Khởi tạo ThreadingHTTPServer đa luồng chống nghẽn
+    # Khởi tạo ThreadingHTTPServer đa luồng chống nghẽn & tái sử dụng port tức thì
+    ThreadingHTTPServer.allow_reuse_address = True
     httpd = ThreadingHTTPServer(server_address, FastFMathHandler)
     httpd.daemon_threads = True
     

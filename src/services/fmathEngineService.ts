@@ -45,18 +45,54 @@ let lastCheckTime = 0;
 
 export const fmathEngineService = {
   /**
-   * Tăng tốc kiểm tra trạng thái Python Engine (bỏ qua chờ đợi lâu)
+   * Tăng tốc kiểm tra trạng thái Python Engine (non-blocking siêu tốc, cache 15s)
    */
   async checkHealth(): Promise<boolean> {
-    // Tăng tốc: Không để giao diện chờ đợi Python check
-    return false;
+    const now = Date.now();
+    if (isEngineAvailable !== null && now - lastCheckTime < 15000) {
+      return isEngineAvailable;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 350);
+      const res = await fetch(`${PYTHON_ENGINE_URL}/api/health`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      isEngineAvailable = res.ok;
+      lastCheckTime = now;
+      return res.ok;
+    } catch {
+      isEngineAvailable = false;
+      lastCheckTime = now;
+      return false;
+    }
   },
 
   /**
-   * Tính toán ma trận chẩn đoán nhận thức & đánh giá cá nhân hoá REAL TIME
+   * Tính toán ma trận chẩn đoán nhận thức & đánh giá cá nhân hoá REAL TIME siêu tốc
    */
   async getPersonalizedEvaluation(userId: string, skills: any[], attempts: any[]): Promise<CognitiveDiagnosticResult> {
-    // Tăng tốc: Chạy thuật toán khảo thí trực tiếp trên Web, 100% dữ liệu thực không độ trễ
+    const hasPython = await this.checkHealth();
+    if (hasPython) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600);
+        const res = await fetch(`${PYTHON_ENGINE_URL}/api/personalized-eval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, skills, attempts }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) {
+        // Fallback tức thì nếu mạng bận
+      }
+    }
     return this.fallbackCalculate(skills, attempts);
   },
 

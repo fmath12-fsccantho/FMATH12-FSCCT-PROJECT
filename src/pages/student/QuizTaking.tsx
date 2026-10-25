@@ -15,6 +15,7 @@ import { useAppStore, useExamStore } from '../../store/useAppStore';
 import { askGroqAI } from '../../services/groqAI';
 import { calculateStreakUpdate } from '../../utils/streakUtils';
 import { SUPPLEMENTAL_SYSTEM_EXAMS } from '../../config/systemExams';
+import { formatMathAndSteps } from '../../utils/mathLatexUtils';
 
 // --- HÀM TIỆN ÍCH ---
 const getQuestionType = (q: any) => {
@@ -503,7 +504,7 @@ const QuizTaking = () => {
     try {
       const studentCurrentAns = answers[q.id] ? JSON.stringify(answers[q.id]) : 'Chưa chọn';
       const sysPrompt = `================================================================================
-BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP SOCRATIC
+BẠN LÀ FMATH12AI - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP SOCRATIC
 ================================================================================
 [THÔNG TIN BÀI TOÁN]
 - Đề bài câu hỏi: "${q.content}"
@@ -692,10 +693,13 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
                       boxClass = "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 ring-1 ring-indigo-500 shadow-2xs"; letterClass = "bg-indigo-600 text-white border-r-0"; textClass = "text-indigo-900 dark:text-indigo-200 font-semibold";
                     }
 
+                    const rawOptText = typeof opt === 'string' ? opt : (opt.text ?? opt.content ?? opt.label ?? '');
+                    const optText = (rawOptText.trim() === '.' || !rawOptText.trim()) ? `Phương án ${displayId}` : rawOptText;
+
                     return (
                       <div key={optId} onClick={() => handleAnswerMCQ(q.id, optId)} className={`w-full flex items-stretch rounded-xl border overflow-hidden transition-all ${boxClass}`}>
                         <div className={`w-12 shrink-0 flex items-center justify-center font-bold text-[15px] font-ui transition-colors ${letterClass}`}>{displayId}</div>
-                        <div className={`flex-1 p-3.5 prose prose-sm max-w-none overflow-x-auto leading-relaxed m-0 flex items-center ${textClass}`}><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
+                        <div className={`flex-1 p-3.5 prose prose-sm max-w-none overflow-x-auto leading-relaxed m-0 flex items-center ${textClass}`}><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{optText}</ReactMarkdown></div>
                       </div>
                     );
                   })}
@@ -711,11 +715,14 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
                     const isCorrectVal = parseTFAnswer(q.correct_answer)[optId];
                     const isUserCorrect = userVal === isCorrectVal;
                     
+                    const rawOptText = typeof opt === 'string' ? opt : (opt.text ?? opt.content ?? opt.label ?? '');
+                    const optText = (rawOptText.trim() === '.' || !rawOptText.trim()) ? `Mệnh đề ${rawOptId}` : rawOptText;
+                    
                     return (
                       <div key={optId} className={`rounded-xl border shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 transition-colors ${result ? (isUserCorrect ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/50' : 'border-rose-500 bg-rose-50/60 dark:bg-rose-950/50') : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 hover:border-indigo-500'}`}>
                         <div className="flex items-start gap-4 flex-1 overflow-x-auto">
                           <div className="w-8 h-8 shrink-0 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center font-bold text-[14px] font-ui text-slate-600 dark:text-slate-300">{rawOptId}</div>
-                          <div className="prose prose-sm max-w-none m-0 pt-1 leading-[1.8] text-slate-800 dark:text-slate-200"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown></div>
+                          <div className="prose prose-sm max-w-none m-0 pt-1 leading-[1.8] text-slate-800 dark:text-slate-200"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{optText}</ReactMarkdown></div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 self-end md:self-center bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
                           <button disabled={result} onClick={() => handleAnswerTF(q.id, optId, true)} className={`px-5 py-2 rounded-lg font-semibold text-[13px] transition-colors cursor-pointer ${userVal === true ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>Đúng</button>
@@ -752,7 +759,7 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
               <div className="flex flex-wrap justify-between items-center gap-3 px-5 py-3.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-bold text-sm uppercase font-heading tracking-wider">
                   <BrainCircuit size={17} className="text-blue-600 dark:text-blue-400" />
-                  <span>Trợ Lý Sư Phạm Socratic AI</span>
+                  <span>FMATH12AI</span>
                   <span className="text-[11px] font-medium text-slate-400 lowercase font-sans">(không giải hộ • gợi ý từng bước)</span>
                 </div>
                 <button 
@@ -763,7 +770,7 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
                       : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-950/50'
                   }`}
                 >
-                  <MessageSquare size={13} /> {openChatId === q.id ? 'Thu gọn AI' : 'Hỏi Trợ lý AI'}
+                  <MessageSquare size={13} /> {openChatId === q.id ? 'Thu gọn AI' : 'Hỏi FMATH12AI'}
                 </button>
               </div>
 
@@ -776,7 +783,7 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
                   <div className="prose prose-sm max-w-none text-slate-750 dark:text-slate-300 leading-relaxed overflow-x-auto [&_.katex-display]:my-3">
                     {q.explanation ? (
                       <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
-                        {q.explanation}
+                        {formatMathAndSteps(q.explanation)}
                       </ReactMarkdown>
                     ) : (
                       <div className="text-slate-400 italic text-xs py-2">Câu hỏi này chưa có lời giải mẫu. Bấm "Hỏi Trợ lý AI" bên trên để nhận phân tích phương pháp nhé!</div>
@@ -842,7 +849,7 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP
                             {msg.role === 'user' ? msg.content : (
                               <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 [&_.katex-display]:my-2">
                                 <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
-                                  {msg.content}
+                                  {formatMathAndSteps(msg.content)}
                                 </ReactMarkdown>
                               </div>
                             )}

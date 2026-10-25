@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import DashboardLayout from './components/layout/DashboardLayout';
 
 const LandingPage = lazy(() => import('./pages/common/LandingPage'));
@@ -107,7 +107,15 @@ function App() {
           <Route path="/grading" element={<AssignmentGrader />} />
           <Route path="/theory-editor/:lessonId" element={<TheoryEditor />} /> 
           <Route path="/exam-editor" element={<ExamEditor />} />
+
+          {/* Phân hệ Quản trị Admin */}
+          <Route path="/admin" element={<OverviewSwitcher />} />
+          <Route path="/admin-analytics" element={<AdminAnalyticsPage />} />
+          <Route path="/user-management" element={<UserManagement />} />
         </Route>
+
+        {/* Điều hướng mặc định nếu sai đường dẫn tránh lỗi trắng màn */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   );

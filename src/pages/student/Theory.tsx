@@ -17,6 +17,7 @@ import { supabase } from '../../config/supabase';
 import { askGroqAI } from '../../services/groqAI';
 import { calculateStreakUpdate } from '../../utils/streakUtils';
 import { MathGraphPlotter } from '../../components/common/MathGraphPlotter';
+import { formatMathAndSteps } from '../../utils/mathLatexUtils';
 
 // 4 Bậc kiến thức chuẩn sư phạm Toán học 12
 const SCAFFOLDING_TIERS = [
@@ -282,15 +283,8 @@ ${tierGuide}
     // 3. Tự động phục hồi thẻ ảnh markdown chuẩn cho các link ảnh Cloudinary hợp lệ (kể cả khi bị trần hoặc dính dấu ngoặc cuối)
     cleaned = cleaned.replace(/(?<!\()https?:\/\/(res\.cloudinary\.com\/[^\s)]+\.(?:png|jpg|jpeg|webp))\)?/gi, '\n\n![Hình ảnh minh họa](https://$1)\n\n');
     
-    // 4. TỰ ĐỘNG CHUYỂN ĐỔI CÔNG THỨC NGOẶC VUÔNG [ ... ] THÀNH $$ ... $$ ĐỂ KATEX HIỂN THỊ CHUẨN
-    cleaned = cleaned.replace(/\\\[([\s\S]*?)\\\]/g, (m, p1) => `\n$$${p1.trim()}$$\n`);
-    cleaned = cleaned.replace(/(?:^|\n)\[\s*(\\begin\{[\s\S]*?\\end\{[^}]+\})\s*\]/g, (m, p1) => `\n$$${p1.trim()}$$\n`);
-    cleaned = cleaned.replace(/(?:^|\n)\[\s*([^\n\[\]]{5,})\s*\](?=\n|$)/g, (match, p1) => {
-      if (/[\\^_=]|x\{|\\bigl|\\frac|\\text|\\mathbb|\\Longleftrightarrow|\\Longrightarrow/i.test(p1)) {
-        return `\n$$${p1.trim()}$$\n`;
-      }
-      return match;
-    });
+    // 4. TỰ ĐỘNG CHUYỂN ĐỔI CÔNG THỨC NGOẶC VUÔNG VÀ TOÀN BỘ CÔNG THỨC LATEX VỀ CHUẨN KATEX
+    cleaned = formatMathAndSteps(cleaned);
 
     // 5. Dọn các dòng trích dẫn rỗng sau khi xóa ảnh
     cleaned = cleaned.replace(/^\s*>\s*$/gm, '');

@@ -18,6 +18,7 @@ import { canEditExam, isFptTeacherOrAdmin, canApproveExam } from '../../utils/pe
 import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
 import { ExamMatrixSummary } from '../../components/teacher/ExamMatrixSummary';
 import { QuestionBankPickerModal } from '../../components/teacher/QuestionBankPickerModal';
+import { formatMathAndSteps } from '../../utils/mathLatexUtils';
 import { 
   calculateQuestionMatrix, 
   normalizeQuestionType, 
@@ -756,7 +757,7 @@ const ExamEditor = () => {
         {part.trim() && (
           <div className="prose prose-base max-w-none text-[#212529] mb-4 leading-[2.2] overflow-x-auto [&_.katex-display]:my-4">
             <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
-              {part}
+              {formatMathAndSteps(part)}
             </ReactMarkdown>
           </div>
         )}

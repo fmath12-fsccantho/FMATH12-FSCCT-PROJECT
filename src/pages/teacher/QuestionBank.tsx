@@ -16,6 +16,7 @@ import { questionAiAnalyzer, QuestionAnalysisResult } from '../../services/quest
 import { CURRICULUM_FRAMEWORK, COGNITIVE_LEVELS } from '../../config/curriculumFramework';
 import { canEditTheoryContent } from '../../utils/permissionUtils';
 import { Eye } from 'lucide-react';
+import { formatMathAndSteps } from '../../utils/mathLatexUtils';
 
 const AI_EXERCISE_PROMPT = `Bạn là một chuyên gia Toán học và kỹ sư dữ liệu giáo dục cho hệ thống FMATH12 PRO.
 Nhiệm vụ: Đọc toàn bộ danh sách bài tập/câu hỏi được cung cấp bên dưới, chuẩn hóa và chuyển đổi 100% thành mảng JSON để nạp vào Ngân hàng câu hỏi của Bài học.
@@ -876,7 +877,7 @@ const QuestionBank = () => {
                                     <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
                                       <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5"><BrainCircuit size={14}/> Lời giải hệ thống</span>
                                       <div className="prose prose-sm max-w-none text-amber-800 dark:text-amber-200 leading-[1.8] [&_.katex-display]:my-2">
-                                        <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{q.explanation}</ReactMarkdown>
+                                        <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{formatMathAndSteps(q.explanation)}</ReactMarkdown>
                                       </div>
                                       {q.explanation.includes('[CẦN CHÈN ẢNH]') && (
                                         <button 

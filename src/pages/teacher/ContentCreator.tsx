@@ -13,6 +13,7 @@ import 'katex/dist/katex.min.css';
 import { supabase } from '../../config/supabase';
 import { askGroqAI } from '../../services/groqAI';
 import { useAppStore } from '../../store/useAppStore';
+import { formatMathAndSteps } from '../../utils/mathLatexUtils';
 
 const TOPIC_OPTIONS = [
   'Ứng dụng đạo hàm khảo sát và vẽ đồ thị hàm số',
@@ -66,9 +67,10 @@ Nhiệm vụ của bạn:
    - Nếu giáo viên có cung cấp "GỢI Ý GIẢI / ĐÁP ÁN CỦA GIÁO VIÊN", bạn PHẢI tuân thủ tuyệt đối logic và đáp án này làm \`correct_answer\`.
    - Dùng chính gợi ý giải đó để viết phần \`explanation\` (Lời giải chi tiết từng bước) rõ ràng, khoa học, đầy đủ công thức toán học bằng LaTeX.
 4. QUY TẮC CÔNG THỨC TOÁN (LATEX):
-   - Công thức toán inline dùng dấu $: $y = f(x)$, $\\int_a^b f(x)dx$.
-   - Công thức toán khối dùng $$: $$\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1$$.
-   - Tuyệt đối KHÔNG dùng \\( hoặc \\).
+   - BẮT BUỘC mọi công thức toán inline bọc bằng dấu đô-la $: $y = f(x)$, $\\frac{d}{dx}(x^n) = n x^{n-1}$.
+   - BẮT BUỘC công thức toán display dòng riêng bọc bằng $$: $$\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1$$.
+   - TUYỆT ĐỐI KHÔNG dùng \\[ hoặc \\] hoặc [ ... ] hoặc \\( hoặc \\) để bao quanh công thức toán học.
+   - Trình bày lời giải chi tiết: mỗi bước phải xuống dòng rõ ràng, bắt đầu bằng "Bước 1: ...", "Bước 2: ...", "Bước 3: ...".
 5. ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
    Chỉ trả về DUY NHẤT 1 chuỗi JSON hợp lệ (không kèm markdown \`\`\`json ở ngoài), theo mẫu sau:
 {
@@ -82,7 +84,7 @@ Nhiệm vụ của bạn:
     {"id": "D", "text": "Phương án D..."}
   ],
   "correct_answer": "A" (với mcq) HOẶC {"a": true, "b": false, "c": true, "d": false} (với tf) HOẶC "12.5" (với saq),
-  "explanation": "Lời giải chi tiết từng bước: Bước 1... Bước 2..."
+  "explanation": "Bước 1: Viết hàm số...\\n\\nBước 2: Áp dụng quy tắc đạo hàm...\\n\\nBước 3: ...\\n\\nVậy đáp án đúng là..."
 }`;
 
       const userPrompt = `[CHUYÊN ĐỀ MỤC TIÊU]: ${selectedTopic}
@@ -101,7 +103,18 @@ ${rawText}`;
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
-      setGeneratedQuestion(parsed);
+
+      // Chuẩn hóa và làm sạch toàn bộ công thức toán học & các bước giải
+      const cleanedQuestion = {
+        ...parsed,
+        content: formatMathAndSteps(parsed.content),
+        explanation: formatMathAndSteps(parsed.explanation),
+        options: Array.isArray(parsed.options)
+          ? parsed.options.map((opt: any) => ({ ...opt, text: formatMathAndSteps(opt.text) }))
+          : parsed.options
+      };
+
+      setGeneratedQuestion(cleanedQuestion);
     } catch (err: any) {
       console.error('Lỗi sinh bài tập bằng AI:', err);
       setErrorMsg(err.message || 'Không thể tạo bài tập lúc này, vui lòng kiểm tra lại kết nối mạng!');
@@ -344,7 +357,7 @@ ${rawText}`;
                     </span>
                     <div className="text-sm text-slate-900 dark:text-white leading-relaxed font-serif prose dark:prose-invert max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}>
-                        {generatedQuestion.content}
+                        {formatMathAndSteps(generatedQuestion.content)}
                       </ReactMarkdown>
                     </div>
                   </div>
@@ -374,7 +387,7 @@ ${rawText}`;
                               </span>
                               <div className="prose dark:prose-invert text-xs">
                                 <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}>
-                                  {opt.text}
+                                  {formatMathAndSteps(opt.text)}
                                 </ReactMarkdown>
                               </div>
                             </div>
@@ -393,7 +406,7 @@ ${rawText}`;
                       </div>
                       <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans prose dark:prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]}>
-                          {generatedQuestion.explanation}
+                          {formatMathAndSteps(generatedQuestion.explanation)}
                         </ReactMarkdown>
                       </div>
                     </div>
