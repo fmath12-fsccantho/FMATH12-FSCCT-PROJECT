@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Clock, BookOpen, GraduationCap, 
   ChevronDown, ChevronRight, Loader2, Target, 
-  CheckCircle2, ListChecks, FileText, Sparkles, ArrowRight, PlayCircle
+  CheckCircle2, ListChecks, FileText, Sparkles, ArrowRight, PlayCircle,
+  Zap, Flame, Award, RefreshCw
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { examService } from '../../services/examService';
+import { supabase } from '../../config/supabase';
+import { EXAM_MATRIX_PRESETS, pickQuestionsByMatrix } from '../../utils/examMatrixUtils';
 
 const TABS = [
   { label: 'Đề theo bài', icon: BookOpen },
@@ -19,11 +22,95 @@ const TABS = [
 const QuizList = () => {
   const { currentUser } = useAppStore();
   const location = useLocation();
+  const navigate = useNavigate();
   
   const [exams, setExams] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('Đề theo bài');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  const [isGeneratingMatrix, setIsGeneratingMatrix] = useState(false);
+  const [isGeneratingFixErrors, setIsGeneratingFixErrors] = useState(false);
+
+  // Tạo đề ngẫu nhiên chuẩn Ma trận Bộ GD&ĐT 2026 (22 câu)
+  const handleGenerateMatrixExam = async () => {
+    if (isGeneratingMatrix) return;
+    setIsGeneratingMatrix(true);
+    try {
+      // Tải câu hỏi từ kho 2,060 câu
+      const { data: exercises, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .limit(200);
+
+      if (error || !exercises || exercises.length === 0) {
+        throw new Error("Không thể tải ngân hàng câu hỏi.");
+      }
+
+      const standardPreset = EXAM_MATRIX_PRESETS[0]; // 22 câu chuẩn Bộ GD&ĐT
+      const picked = pickQuestionsByMatrix(exercises, standardPreset.matrix);
+      
+      const customId = `matrix-exam-${Date.now()}`;
+      const examTitle = `Đề Thi Thử Chuẩn Ma Trận Bộ GD&ĐT 2026 (#${Math.floor(Math.random() * 900 + 100)})`;
+      const customExam = {
+        id: customId,
+        title: examTitle,
+        description: 'Đề ngẫu nhiên chuẩn ma trận: 12 câu MCQ (Phần I) + 4 câu Đúng/Sai (Phần II) + 6 câu Trả lời ngắn (Phần III).',
+        time_limit: 90 * 60,
+        total_marks: 10,
+        type: 'Đề luyện thi'
+      };
+
+      sessionStorage.setItem(`fmath_custom_exam_${customId}`, JSON.stringify({
+        exam: customExam,
+        questions: picked.picked.length > 0 ? picked.picked : exercises.slice(0, 22)
+      }));
+
+      navigate(`/quiz/${customId}/take`);
+    } catch (err: any) {
+      alert("Lỗi tạo đề ngẫu nhiên: " + (err.message || 'Vui lòng thử lại'));
+    } finally {
+      setIsGeneratingMatrix(false);
+    }
+  };
+
+  // Luyện tập khắc phục lỗi sai & bẫy tư duy
+  const handleFixErrorsPractice = async () => {
+    if (isGeneratingFixErrors) return;
+    setIsGeneratingFixErrors(true);
+    try {
+      // Lấy 10-12 câu hỏi vận dụng / vận dụng cao dễ gặp bẫy
+      const { data: exercises, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .in('level', ['Vận dụng', 'Vận dụng cao'])
+        .limit(100);
+
+      const pool = exercises && exercises.length > 0 ? exercises : [];
+      const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 10);
+
+      const customId = `error-fix-${Date.now()}`;
+      const customExam = {
+        id: customId,
+        title: `Luyện Tập Khắc Phục Lỗi Sai & Giải Mã Bẫy Đề (#${Math.floor(Math.random() * 900 + 100)})`,
+        description: 'Tập trung rèn luyện các dạng toán có bẫy nhiễu trắc nghiệm mới, củng cố điều kiện và tối ưu phản xạ.',
+        time_limit: 40 * 60,
+        total_marks: 10,
+        type: 'Chuyên đề'
+      };
+
+      sessionStorage.setItem(`fmath_custom_exam_${customId}`, JSON.stringify({
+        exam: customExam,
+        questions: shuffled
+      }));
+
+      navigate(`/quiz/${customId}/take`);
+    } catch (err: any) {
+      alert("Lỗi khởi tạo bài luyện tập: " + (err.message || 'Vui lòng thử lại'));
+    } finally {
+      setIsGeneratingFixErrors(false);
+    }
+  };
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -43,6 +130,13 @@ const QuizList = () => {
 
       if (location.state && (location.state as any).activeTab) {
         setActiveTab((location.state as any).activeTab);
+      }
+
+      // Xử lý chuyển hướng trực tiếp từ Dashboard nếu có yêu cầu
+      if (location.state && (location.state as any).mode === 'matrix_2026') {
+        handleGenerateMatrixExam();
+      } else if (location.state && (location.state as any).mode === 'fix_errors') {
+        handleFixErrorsPractice();
       }
     };
     
@@ -85,6 +179,85 @@ const QuizList = () => {
             <div className="flex items-center gap-2 self-start sm:self-auto bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>Tổng số: <strong className="text-slate-900 dark:text-white font-raleway">{exams.length}</strong> đề thi</span>
+            </div>
+          </div>
+
+          {/* 2 KHỐI TÍNH NĂNG ĐỘC QUYỀN CHUẨN 2026 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Đề ngẫu nhiên theo ma trận 2026 */}
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-white dark:from-slate-900 dark:to-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col justify-between space-y-4 shadow-sm group">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
+                    <Sparkles size={20} />
+                  </div>
+                  <span className="badge-fmath text-[10.5px]">Chuẩn BGD 2026</span>
+                </div>
+                <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white m-0">
+                  Tạo Đề Ngẫu Nhiên Theo Ma Trận Thi 2026
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 m-0 leading-relaxed">
+                  Tự động bốc ngẫu nhiên 22 câu từ ngân hàng 2,060 câu: 12 MCQ (Phần I) + 4 Đúng/Sai (Phần II) + 6 Trả lời ngắn (Phần III) theo đúng tỉ lệ 4 tầng nhận thức.
+                </p>
+              </div>
+
+              <button
+                onClick={handleGenerateMatrixExam}
+                disabled={isGeneratingMatrix}
+                className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold font-heading text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingMatrix ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Đang bốc 22 câu chuẩn ma trận...</span>
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle size={16} />
+                    <span>Bắt Đầu Làm Đề Ngẫu Nhiên 2026</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Luyện tập khắc phục lỗi sai */}
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-amber-50/90 via-rose-50/60 to-white dark:from-slate-900 dark:to-rose-950/40 border border-amber-200/80 dark:border-rose-900/60 flex flex-col justify-between space-y-4 shadow-sm group">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-rose-600 text-white flex items-center justify-center shadow-md shadow-amber-600/20">
+                    <Target size={20} />
+                  </div>
+                  <span className="text-[10.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-200/70">
+                    Xóa Bỏ Điểm Mù
+                  </span>
+                </div>
+                <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white m-0">
+                  Luyện Tập Khắc Phục Lỗi Sai & Bẫy Đề
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 m-0 leading-relaxed">
+                  Luyện tập 10 câu hỏi có tỉ lệ sai cao, tập trung giải mã bẫy trắc nghiệm mới, củng cố điều kiện và phương pháp biến đổi nhanh.
+                </p>
+              </div>
+
+              <button
+                onClick={handleFixErrorsPractice}
+                disabled={isGeneratingFixErrors}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-700 hover:to-rose-700 text-white font-bold font-heading text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-600/25 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingFixErrors ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Đang tổng hợp 10 bài tập bẫy đề...</span>
+                  </>
+                ) : (
+                  <>
+                    <Flame size={16} />
+                    <span>Bắt Đầu Khắc Phục Lỗi Sai</span>
+                    <ArrowRight size={14} />
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

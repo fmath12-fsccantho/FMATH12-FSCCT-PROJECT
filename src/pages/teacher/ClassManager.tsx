@@ -1552,11 +1552,31 @@ const ClassManagement = () => {
                 </div>
               ) : (
                 <div className="space-y-5">
-                  <div className="p-3 bg-[#d1e7dd] border border-[#a3cfbb] rounded-lg text-[12px] font-medium text-[#0f5132]">
-                    <span className="font-bold uppercase tracking-wider block mb-1">Hướng dẫn:</span> File Excel bắt buộc phải có 2 cột <strong>"Họ tên"</strong> và <strong>"Email"</strong>.
+                  <div className="p-3 bg-[#d1e7dd] border border-[#a3cfbb] rounded-lg text-[12px] font-medium text-[#0f5132] flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-bold uppercase tracking-wider block mb-0.5">Hướng dẫn:</span> 
+                      File Excel cần chứa các cột: <strong>"Họ và tên"</strong>, <strong>"Email"</strong>, và <strong>"Mã số học sinh"</strong>.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const wb = XLSX.utils.book_new();
+                        const sampleData = [
+                          { 'STT': 1, 'Mã số học sinh': 'FCT12001', 'Họ và tên': 'Nguyễn Văn An', 'Email': 'an.nv@fpt.edu.vn' },
+                          { 'STT': 2, 'Mã số học sinh': 'FCT12002', 'Họ và tên': 'Trần Thị Bình', 'Email': 'binh.tt@fpt.edu.vn' },
+                          { 'STT': 3, 'Mã số học sinh': 'FCT12003', 'Họ và tên': 'Lê Hoàng Cường', 'Email': 'cuong.lh@fpt.edu.vn' },
+                        ];
+                        const ws = XLSX.utils.json_to_sheet(sampleData);
+                        XLSX.utils.book_append_sheet(wb, ws, 'Danh_Sach_Mau');
+                        XLSX.writeFile(wb, 'Mau_Danh_Sach_Lop_FMATH12.xlsx');
+                      }}
+                      className="px-2.5 py-1 rounded bg-[#198754] hover:bg-[#157347] text-white text-[11px] font-bold shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
+                    >
+                      <Download size={12} /> Tải file mẫu
+                    </button>
                   </div>
                   <label className="cursor-pointer flex flex-col items-center p-8 border-2 border-dashed border-[#dee2e6] rounded-xl hover:border-[#198754] hover:bg-[#f8f9fa] transition-colors">
-                    {isProcessing ? <Loader2 size={32} className="animate-spin text-[#198754]"/> : <><UploadCloud size={32} className="text-[#adb5bd] mb-2"/><span className="font-bold text-[#495057] text-[14px]">Nhấn để tải file (.xlsx)</span><input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExcelUpload}/></>}
+                    {isProcessing ? <Loader2 size={32} className="animate-spin text-[#198754]"/> : <><UploadCloud size={32} className="text-[#adb5bd] mb-2"/><span className="font-bold text-[#495057] text-[14px]">Nhấn để tải file Excel (.xlsx, .xls)</span><span className="text-[11px] text-slate-400 mt-1">Hệ thống tự động đồng bộ tài khoản học sinh</span><input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExcelUpload}/></>}
                   </label>
                 </div>
               )}

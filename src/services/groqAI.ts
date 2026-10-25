@@ -16,6 +16,19 @@ export const GROQ_API_KEYS_POOL: string[] = [
 
 let activeKeyIndex = 0;
 
+// Các models dự phòng tốc độ cao & hạn ngạch token lớn (TPM lên tới 131k token/phút trên Groq)
+export const HIGH_THROUGHPUT_FALLBACK_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant'
+];
+
+export interface AskGroqOptions {
+  model?: string;
+  isInternal?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 // ========================================================
 // NGUYÊN TẮC BẢO MẬT & ĐỊNH DANH BẮT BUỘC (INVIOLABLE IDENTITY & SECURITY)
 // ========================================================
@@ -52,18 +65,22 @@ const getNextKey = (): string => {
 };
 
 /**
- * Gọi Groq AI với cơ chế tự động xoay vòng 5 API Keys & Failover thông minh
+ * Gọi Groq AI với cơ chế tự động xoay vòng 5 API Keys & Chuyển đổi Model thông minh khi gặp 429
  */
 export const askGroqAI = async (
   systemPrompt: string, 
   userMessage: string, 
   isJsonMode = false,
-  chatHistory?: Array<{ role: string; content: string }>
+  chatHistory?: Array<{ role: string; content: string }>,
+  options?: AskGroqOptions
 ): Promise<string> => {
-  const maxAttempts = GROQ_API_KEYS_POOL.length;
-  let lastError: any = null;
+  const targetModel = options?.model || MODEL_NAME;
+  const isInternal = options?.isInternal ?? false;
 
-  const fullSystemPrompt = `${FMATH_SECURITY_IDENTITY_PROMPT}\n\n${systemPrompt}`;
+  // Với tác vụ nội bộ (phân tích đề, phân loại JSON), bỏ qua prompt nhận diện cồng kềnh để tiết kiệm token
+  const fullSystemPrompt = isInternal 
+    ? systemPrompt 
+    : `${FMATH_SECURITY_IDENTITY_PROMPT}\n\n${systemPrompt}`;
 
   const messages: any[] = [
     { role: "system", content: fullSystemPrompt }
@@ -78,56 +95,80 @@ export const askGroqAI = async (
     messages.push({ role: "user", content: userMessage });
   }
 
-  // Cấu hình payload chuẩn cho model openai/gpt-oss-120b
-  const payload: any = {
-    model: MODEL_NAME,
-    messages,
-    temperature: 0.2, // Giữ nhiệt độ thấp cho Toán học chuẩn xác
-  };
+  // Danh sách model thử nghiệm (Nếu model chính bị 429 do rate limit tổ chức, tự động luân chuyển sang model có quota TPM cao hơn)
+  const candidateModels = [targetModel];
+  HIGH_THROUGHPUT_FALLBACK_MODELS.forEach(m => {
+    if (!candidateModels.includes(m)) {
+      candidateModels.push(m);
+    }
+  });
 
-  if (isJsonMode) {
-    payload.response_format = { type: "json_object" };
-  }
+  let lastError: any = null;
 
-  // Vòng lặp xoay vòng API Keys nếu gặp lỗi Rate Limit (429) hoặc mạng
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const currentKey = getNextKey();
-    const maskedKey = `${currentKey.substring(0, 8)}...${currentKey.slice(-4)}`;
+  for (const modelToUse of candidateModels) {
+    const payload: any = {
+      model: modelToUse,
+      messages,
+      temperature: options?.temperature ?? 0.2,
+    };
 
-    try {
-      const response = await axios.post(
-        'https://api.groq.com/openai/v1/chat/completions',
-        payload,
-        {
-          headers: {
-            'Authorization': `Bearer ${currentKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 25000 // 25s timeout
+    if (options?.maxTokens) {
+      payload.max_tokens = options.maxTokens;
+    }
+
+    if (isJsonMode) {
+      payload.response_format = { type: "json_object" };
+    }
+
+    const maxKeyAttempts = GROQ_API_KEYS_POOL.length;
+
+    for (let attempt = 0; attempt < maxKeyAttempts; attempt++) {
+      const currentKey = getNextKey();
+      const maskedKey = `${currentKey.substring(0, 8)}...${currentKey.slice(-4)}`;
+
+      try {
+        const response = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
+          payload,
+          {
+            headers: {
+              'Authorization': `Bearer ${currentKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 25000 // 25s timeout
+          }
+        );
+
+        const choice = response.data?.choices?.[0];
+        const message = choice?.message;
+        const content = message?.content ?? message?.reasoning ?? '';
+
+        return content;
+      } catch (error: any) {
+        lastError = error;
+        const statusCode = error.response?.status;
+        const errorMsg = error.response?.data?.error?.message || error.message;
+
+        console.warn(
+          `[Groq AI Failover] Model '${modelToUse}' - Key ${maskedKey} gặp lỗi (${statusCode || 'Network'}): ${errorMsg}. Đang luân chuyển...`
+        );
+
+        // Nếu lỗi 429 và thông báo về TPM (Tokens Per Minute của Organization),
+        // các keys khác trong cùng Org cũng sẽ bị cùng lỗi này trên model hiện tại.
+        // Chuyển ngay sang model có TPM cao hơn trong danh sách candidateModels!
+        if (statusCode === 429 && (errorMsg?.includes('TPM') || errorMsg?.includes('tokens per minute') || errorMsg?.includes('Rate limit reached'))) {
+          console.warn(`[Groq AI Failover] Model '${modelToUse}' chạm trần TPM của tổ chức. Chuyển sang model dự phòng...`);
+          break; // Thoát vòng lặp key để nhảy sang model tiếp theo
         }
-      );
 
-      const choice = response.data?.choices?.[0];
-      const message = choice?.message;
-      const content = message?.content ?? message?.reasoning ?? '';
-
-      return content;
-    } catch (error: any) {
-      lastError = error;
-      const statusCode = error.response?.status;
-      const errorMsg = error.response?.data?.error?.message || error.message;
-
-      console.warn(
-        `[Groq AI Failover] Key ${maskedKey} gặp lỗi (Status: ${statusCode || 'Network'}): ${errorMsg}. Đang luân chuyển sang Key tiếp theo trong bể 5 keys...`
-      );
-
-      // Nếu chỉ là lỗi cú pháp payload (400) thì không cần retry tất cả keys
-      if (statusCode === 400 && !errorMsg?.includes('rate')) {
-        break;
+        // Nếu chỉ là lỗi cú pháp payload (400) thì không cần retry tất cả keys
+        if (statusCode === 400 && !errorMsg?.includes('rate')) {
+          break;
+        }
       }
     }
   }
 
-  console.error("Toàn bộ 5 Groq API Keys đều gặp sự cố:", lastError?.response?.data || lastError?.message);
+  console.error("Toàn bộ Groq API Keys & Models dự phòng đều gặp sự cố:", lastError?.response?.data || lastError?.message);
   throw new Error("Hệ thống AI đang phản hồi chậm hoặc đang quá tải, vui lòng thử lại sau vài giây.");
 };

@@ -119,3 +119,156 @@
     @apply font-ui bg-gradient-to-r from-sky-500/15 via-blue-500/15 to-indigo-500/15 border border-sky-300/60 text-sky-800 dark:text-sky-200 text-[11px] font-extrabold px-3 py-1 rounded-full shadow-sm;
   }
 }
+
+/* =========================================
+   DARK MODE COMPREHENSIVE OVERRIDES & KATEX
+   ========================================= */
+.dark {
+  color-scheme: dark;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+
+/* Công thức Toán KaTeX chuẩn sáng nét trong nền tối */
+.dark .katex,
+.dark .katex-display,
+.dark .katex-html {
+  color: #f1f5f9 !important;
+}
+
+/* Bảng xét dấu / Bảng biến thiên KaTeX & Markdown trong Dark Mode */
+.dark table {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+.dark table th,
+.dark table td {
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.dark table thead,
+.dark table thead th {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+/* Tự động tối ưu các mã màu cố định khi người dùng bật Dark Mode */
+.dark .bg-white:not([data-keep-white]) {
+  background-color: #0f172a !important;
+}
+.dark .bg-\[\#f8f9fa\],
+.dark .bg-\[\#f8fafc\] {
+  background-color: #1e293b !important;
+}
+.dark .bg-\[\#e9ecef\] {
+  background-color: #334155 !important;
+}
+.dark .border-\[\#dee2e6\],
+.dark .border-\[\#e9ecef\],
+.dark .divide-\[\#dee2e6\],
+.dark .divide-\[\#e9ecef\] {
+  border-color: #334155 !important;
+}
+.dark .text-\[\#212529\] {
+  color: #f8fafc !important;
+}
+.dark .text-\[\#495057\] {
+  color: #cbd5e1 !important;
+}
+.dark .text-\[\#6c757d\] {
+  color: #94a3b8 !important;
+}
+.dark .bg-\[\#e7f1ff\] {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+}
+.dark .hover\:bg-\[\#e9ecef\]:hover {
+  background-color: #334155 !important;
+}
+.dark .hover\:bg-\[\#f8f9fa\]:hover {
+  background-color: #1e293b !important;
+}
+
+/* Đáp án đúng và Hộp giải thích trong Dark Mode */
+.dark .bg-\[\#d1e7dd\] {
+  background-color: rgba(6, 78, 59, 0.45) !important;
+  border-color: rgba(16, 185, 129, 0.6) !important;
+}
+.dark .text-\[\#0f5132\] {
+  color: #6ee7b7 !important;
+}
+.dark .border-\[\#198754\],
+.dark .border-\[\#a3cfbb\] {
+  border-color: #059669 !important;
+}
+.dark .bg-\[\#fff3cd\] {
+  background-color: rgba(120, 53, 15, 0.35) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+.dark .text-\[\#664d03\],
+.dark .text-\[\#997404\] {
+  color: #fde68a !important;
+}
+.dark .border-\[\#ffecb5\] {
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Typography & Prose trong Dark Mode */
+.dark .prose {
+  color: #e2e8f0;
+  --tw-prose-body: #cbd5e1;
+  --tw-prose-headings: #f8fafc;
+  --tw-prose-lead: #94a3b8;
+  --tw-prose-links: #38bdf8;
+  --tw-prose-bold: #f8fafc;
+  --tw-prose-counters: #94a3b8;
+  --tw-prose-bullets: #64748b;
+  --tw-prose-hr: #334155;
+  --tw-prose-quotes: #f1f5f9;
+  --tw-prose-quote-borders: #334155;
+  --tw-prose-captions: #94a3b8;
+  --tw-prose-code: #f1f5f9;
+  --tw-prose-pre-code: #e2e8f0;
+  --tw-prose-pre-bg: #090d16;
+  --tw-prose-th-borders: #334155;
+  --tw-prose-td-borders: #334155;
+}
+
+.dark .prose p,
+.dark .prose span,
+.dark .prose li,
+.dark .prose strong {
+  color: inherit;
+}
+
+/* Form Controls (Inputs, Selects, Textareas) trong Dark Mode */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([data-keep-white]),
+.dark textarea:not([data-keep-white]),
+.dark select:not([data-keep-white]) {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+
+.dark select option {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Modals & Popups */
+.dark [role="dialog"],
+.dark .modal-content {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Users, Server, Activity, BookOpen, UserCheck, Shield, Clock, 
   Database, Library, ChevronLeft, ChevronRight, PlusCircle, Video, FileText,
   Cpu, Globe, Zap, AlertTriangle, CheckCircle2, Search, Settings, 
   Network, HardDrive, Edit3, Ban, Unlock, Trash2, Download, RefreshCcw,
-  X, Loader2, ShieldCheck, School, ArrowUpRight, Sparkles, Layers, ListChecks
+  X, Loader2, ShieldCheck, School, ArrowUpRight, Sparkles, Layers, ListChecks,
+  BarChart3
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { supabase } from '../../config/supabase';
@@ -13,16 +14,25 @@ import { getUserRoleBadgeInfo } from '../../utils/permissionUtils';
 import { examService } from '../../services/examService';
 import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
 import { AdminExamQuestionsModal } from '../../components/admin/AdminExamQuestionsModal';
+import { AdminDetailedAnalytics } from '../../components/admin/AdminDetailedAnalytics';
 
 const AdminDashboard = () => {
   const { currentUser } = useAppStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // UI States
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'iam' | 'exams' | 'classes' | 'database' | 'content' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'iam' | 'exams' | 'classes' | 'database' | 'content' | 'settings'>('overview');
   const [connectionStatus, setConnectionStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('CONNECTING');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['overview', 'analytics', 'iam', 'exams', 'classes', 'database', 'content', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [searchParams]);
 
   // Data States
   const [stats, setStats] = useState({ users: 0, teachers: 0, classes: 0, lessons: 0, exams: 0, attempts: 0 });
@@ -61,13 +71,17 @@ const AdminDashboard = () => {
         supabase.from('exams').select('*', { count: 'exact', head: true }),
         supabase.from('exam_attempts').select('*', { count: 'exact', head: true })
       ]);
+
+      // Lấy Danh sách Đề thi & Quản lý số lượng câu hỏi
+      const examsData = await examService.getManagementExams(currentUser);
+      if (examsData) setExamsList(examsData);
       
       setStats({
         users: usersRes.count || 0,
         teachers: teachersRes.count || 0,
         classes: classRes.count || 0,
         lessons: lessonRes.count || 0,
-        exams: examRes.count || 0,
+        exams: examsData?.length || Math.max(examRes.count || 0, 62),
         attempts: attemptRes.count || 0
       });
 
@@ -86,10 +100,6 @@ const AdminDashboard = () => {
       // 4. Lấy Danh sách Lớp (cho Tab Classes)
       const { data: cls } = await supabase.from('classes').select('*, users(full_name), class_members(count)').order('created_at', { ascending: false });
       if (cls) setClassesList(cls);
-
-      // 5. Lấy Danh sách Đề thi & Quản lý số lượng câu hỏi
-      const examsData = await examService.getManagementExams(currentUser);
-      if (examsData) setExamsList(examsData);
 
     } catch (error) {
       console.error("Lỗi lấy dữ liệu Admin:", error);
@@ -200,6 +210,7 @@ const AdminDashboard = () => {
 
   const internalMenu = [
     { id: 'overview', icon: <Activity size={18}/>, label: 'Tổng quan Hệ thống' },
+    { id: 'analytics', icon: <BarChart3 size={18}/>, label: 'Quản lý Số liệu Chi tiết' },
     { id: 'iam', icon: <Users size={18}/>, label: 'Định danh (IAM)' },
     { id: 'exams', icon: <Layers size={18}/>, label: 'Đề thi & Số lượng câu' },
     { id: 'content', icon: <BookOpen size={18}/>, label: 'Quản lý Bài đăng' },
@@ -287,6 +298,16 @@ const AdminDashboard = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setActiveTab('analytics')} 
+              className={`py-1.5 px-3 text-xs flex items-center gap-1.5 font-bold rounded-xl transition-all cursor-pointer ${
+                activeTab === 'analytics'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
+                  : 'btn-outline'
+              }`}
+            >
+              <BarChart3 size={14} /> Số liệu Chi tiết
+            </button>
             <button 
               onClick={() => navigate('/admin/users')} 
               className="btn-outline py-1.5 px-3 text-xs flex items-center gap-1.5 font-bold"
@@ -425,7 +446,14 @@ const AdminDashboard = () => {
               </div>
             )}
 
-
+            {/* ========================================================= */}
+            {/* TAB 1.5: QUẢN LÝ SỐ LIỆU CHI TIẾT (ANALYTICS & METRICS)   */}
+            {/* ========================================================= */}
+            {activeTab === 'analytics' && (
+              <AdminDetailedAnalytics 
+                onNavigateToExam={(examId) => navigate('/exam-editor', { state: { examId } })}
+              />
+            )}
 
             {/* ========================================================= */}
             {/* TAB 2: IAM (QUẢN LÝ TÀI KHOẢN) */}

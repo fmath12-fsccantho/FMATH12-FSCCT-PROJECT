@@ -315,13 +315,6 @@ const LoginPage = () => {
     }
   };
 
-  // Quick 1-click Demo Fill
-  const fillDemo = (email: string, pass: string) => {
-    setLoginEmail(email);
-    setLoginPass(pass);
-    handleLogin(undefined, email, pass);
-  };
-
   return (
     <div className="min-h-screen w-full relative font-sans text-slate-800 dark:text-slate-100 bg-[#f8fafc] dark:bg-[#0b0f19] flex flex-col justify-between selection:bg-blue-600 selection:text-white transition-colors duration-200 overflow-x-hidden">
       
@@ -507,36 +500,6 @@ const LoginPage = () => {
                   {loading ? <Loader2 size={17} className="animate-spin" /> : <LogIn size={17} />}
                   Đăng nhập vào hệ thống
                 </button>
-
-                {/* 1-Click Quick Demo Accounts (Dành cho thử nghiệm ngay) */}
-                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10.5px] font-bold font-heading text-slate-400 uppercase tracking-wider">
-                      ⚡ Trải nghiệm nhanh (Demo)
-                    </span>
-                    <span className="text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
-                      1 Chạm • Đăng nhập ngay
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fillDemo('hocsinhdemo.bgk@gmail.com', '123456')}
-                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-bold font-heading transition-all shadow-2xs cursor-pointer active:scale-95"
-                    >
-                      <GraduationCap size={15} className="text-blue-600 dark:text-blue-400" />
-                      <span>Học Sinh Demo</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fillDemo('giaoviendemo.bgk@gmail.com', '123456')}
-                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-bold font-heading transition-all shadow-2xs cursor-pointer active:scale-95"
-                    >
-                      <User size={15} className="text-blue-600 dark:text-blue-400" />
-                      <span>Giáo Viên Demo</span>
-                    </button>
-                  </div>
-                </div>
 
               </form>
             )}

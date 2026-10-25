@@ -7,7 +7,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { auth } from '../../config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { studentService } from '../../services/studentService';
-import { Loader2, BellRing, CheckCircle2, Sparkles, Heart, Award } from 'lucide-react';
+import { Loader2, BellRing, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../config/supabase'; 
 import ReactMarkdown from 'react-markdown';
 
@@ -23,7 +23,6 @@ const DashboardLayout = () => {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [popupNotifs, setPopupNotifs] = useState<any[]>([]);
-  const [showBgkWelcome, setShowBgkWelcome] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const location = useLocation();
@@ -36,6 +35,7 @@ const DashboardLayout = () => {
     }
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [location.pathname]);
+
   const hideMenu = location.pathname.includes('/live-exam') || 
                    location.pathname.includes('/live-monitor') ||
                    location.search.includes('embed=true');
@@ -51,16 +51,8 @@ const DashboardLayout = () => {
           
           let targetRole = 'student';
           if (userEmail === '5phutcungpy@gmail.com') targetRole = 'admin';
-          else if (userEmail === 'aiquizfct@gmail.com' || userEmail === 'giaoviendemo.bgk@gmail.com' || userEmail.endsWith('@fpt.edu.vn')) targetRole = 'teacher'; 
-          else if (userEmail.includes('fct') || userEmail === 'hocsinhdemo.bgk@gmail.com') targetRole = 'student'; 
-
-          // Kiểm tra và hiển thị popup chào mừng BGK
-          if (userEmail === 'hocsinhdemo.bgk@gmail.com' || userEmail === 'giaoviendemo.bgk@gmail.com') {
-            const hasSeen = sessionStorage.getItem('has_seen_bgk_welcome');
-            if (!hasSeen) {
-              setShowBgkWelcome(true);
-            }
-          }
+          else if (userEmail === 'aiquizfct@gmail.com' || userEmail.endsWith('@fpt.edu.vn')) targetRole = 'teacher'; 
+          else if (userEmail.includes('fct')) targetRole = 'student'; 
 
           if (profile) {
             // Giữ nguyên role đã được phân quyền trong Database
@@ -68,24 +60,12 @@ const DashboardLayout = () => {
               await supabase.from('users').update({ role: 'admin' }).eq('id', profile.id);
               profile.role = 'admin';
             }
-            if (userEmail === 'giaoviendemo.bgk@gmail.com' && profile.role !== 'teacher') {
-              await supabase.from('users').update({ role: 'teacher', full_name: 'BGK CUỘC THI STTTNNĐ - GIÁO VIÊN' }).eq('id', profile.id);
-              profile.role = 'teacher';
-              profile.full_name = 'BGK CUỘC THI STTTNNĐ - GIÁO VIÊN';
-            }
-            if (userEmail === 'hocsinhdemo.bgk@gmail.com' && profile.full_name !== 'BGK CUỘC THI STTTNNĐ - HỌC SINH') {
-              await supabase.from('users').update({ full_name: 'BGK CUỘC THI STTTNNĐ - HỌC SINH' }).eq('id', profile.id);
-              profile.full_name = 'BGK CUỘC THI STTTNNĐ - HỌC SINH';
-            }
             setUser(profile);
             currentUserId = profile.id; 
           } else {
-            // Sinh tài khoản BGK hoặc TS tự do
-            let fallbackName = firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Bạn mới";
-            if (userEmail === 'hocsinhdemo.bgk@gmail.com') fallbackName = 'BGK CUỘC THI STTTNNĐ - HỌC SINH';
-            else if (userEmail === 'giaoviendemo.bgk@gmail.com') fallbackName = 'BGK CUỘC THI STTTNNĐ - GIÁO VIÊN';
-            
-            const fallbackStudentCode = userEmail.includes('bgk') ? 'BGK_2026' : `TS_${Math.floor(Date.now() / 1000)}`; 
+            // Sinh tài khoản học sinh mới
+            const fallbackName = firebaseUser.displayName || firebaseUser.email.split('@')[0] || "Học sinh";
+            const fallbackStudentCode = `TS_${Math.floor(Date.now() / 1000)}`; 
 
             const { data, error } = await supabase.from('users').insert({
               email: firebaseUser.email, 
@@ -95,10 +75,14 @@ const DashboardLayout = () => {
               student_code: fallbackStudentCode 
             }).select().single();
 
-            if (error) console.error("Lỗi tạo TS tự do:", error);
+            if (error) console.error("Lỗi tạo người dùng mới:", error);
 
-            if (data) { setUser(data); currentUserId = data.id; } 
-            else { currentUserId = firebaseUser.uid; }
+            if (data) { 
+              setUser(data); 
+              currentUserId = data.id; 
+            } else { 
+              currentUserId = firebaseUser.uid; 
+            }
           }
 
           if (currentUserId) {
@@ -115,14 +99,11 @@ const DashboardLayout = () => {
               setPopupNotifs(unreadNotifs);
             }
           }
-        } catch (error) { console.error("Lỗi đồng bộ dữ liệu Layout:", error); }
-      } else {
-        const isDemoActive = localStorage.getItem('demo_mode') === 'true';
-        if (isDemoActive) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
+        } catch (error) { 
+          console.error("Lỗi đồng bộ dữ liệu Layout:", error); 
         }
+      } else {
+        setIsAuthenticated(false);
       }
       setIsAuthChecking(false);
     });
@@ -135,9 +116,7 @@ const DashboardLayout = () => {
     setPopupNotifs(prev => prev.filter(n => n.id !== notifId));
   };
 
-  const isDemo = localStorage.getItem('demo_mode') === 'true';
-
-  if (isAuthChecking && !isDemo) {
+  if (isAuthChecking) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#f8f9fa] text-[#6c757d]">
         <Loader2 size={32} className="animate-spin mb-4 text-primary" />
@@ -146,8 +125,8 @@ const DashboardLayout = () => {
     );
   }
 
-  // FIX LỖI: Nếu chưa đăng nhập thì ép văng ra trang Login
-  if (!isAuthenticated && !isDemo) {
+  // Nếu chưa đăng nhập thì chuyển hướng sang trang Login
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -209,52 +188,6 @@ const DashboardLayout = () => {
             </div>
             <button onClick={() => handleAcknowledgePopup(popupNotifs[0].id)} className="btn-primary w-full py-2.5">
               <CheckCircle2 size={18} /> TÔI ĐÃ HIỂU
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================== */}
-      {/* MODAL CHÀO MỪNG BAN GIÁM KHẢO              */}
-      {/* ========================================== */}
-      {showBgkWelcome && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 md:p-8 shadow-2xl border border-indigo-200/80 dark:border-indigo-900 relative overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-500/30 animate-bounce">
-                <Sparkles size={32} />
-              </div>
-              <span className="badge-aura">
-                Hệ Sinh Thái Giáo Dục Số
-              </span>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white font-heading mt-3 mb-1">
-                KÍNH CHÀO QUÝ BAN GIÁM KHẢO!
-              </h2>
-              <p className="text-[13px] font-bold text-blue-600 dark:text-blue-400">
-                {currentUser?.name || (currentUser?.role === 'teacher' ? 'BGK CUỘC THI - GIÁO VIÊN' : 'BGK CUỘC THI - HỌC SINH')}
-              </p>
-            </div>
-
-            {/* Nội dung thư cảm ơn & chúc sức khỏe */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200/70 dark:border-slate-700 mb-6 text-slate-700 dark:text-slate-300 text-[14px] leading-relaxed space-y-3">
-              <p>
-                Lời đầu tiên, nhóm tác giả dự án <strong>FMATH12 (Hệ sinh thái Học tập Thích ứng & Trí tuệ Toán học 12)</strong> xin được gửi lời chào trân trọng nhất và lời cảm ơn chân thành, sâu sắc đến <strong>Quý Ban Giám Khảo</strong> đã dành thời gian quý báu để thẩm định và trải nghiệm sản phẩm.
-              </p>
-              <p className="font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center gap-2 text-xs">
-                💐 Kính chúc Quý Ban Giám Khảo luôn dồi dào sức khỏe, hạnh phúc và có những trải nghiệm thật hài lòng cùng nền tảng FMATH12!
-              </p>
-            </div>
-
-            {/* Nút bấm trải nghiệm */}
-            <button 
-              onClick={() => {
-                setShowBgkWelcome(false);
-                sessionStorage.setItem('has_seen_bgk_welcome', 'true');
-              }}
-              className="btn-primary w-full py-3.5 text-[15px] font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
-            >
-              <CheckCircle2 size={18} /> BẮT ĐẦU TRẢI NGHIỆM FMATH12
             </button>
           </div>
         </div>

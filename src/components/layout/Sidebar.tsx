@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, BookOpen, PenTool, Trophy, 
-  User, Users, LogOut, ShieldCheck, Database, Library, Shield, Video, FolderOpen, X, Sparkles, Flame, Cpu, Activity
+  User, Users, LogOut, ShieldCheck, Database, Library, Shield, Video, FolderOpen, X, Sparkles, Flame, Cpu, Activity,
+  BarChart3, ExternalLink, Award, FileText
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { signOut } from 'firebase/auth';
@@ -54,6 +55,9 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       roles: ['teacher', 'admin'],
       items: [
         { icon: <ShieldCheck size={19} />, label: 'Quản lý Lớp học', path: '/class-manager', roles: ['teacher', 'admin'] },
+        { icon: <Flame size={19} />, label: 'Bản đồ Nhiệt Lớp', path: '/class-manager?tab=heatmap', roles: ['teacher', 'admin'] },
+        { icon: <Sparkles size={19} />, label: 'Biên soạn bằng AI', path: '/content-creator', roles: ['teacher', 'admin'] },
+        { icon: <CheckCircle2 size={19} />, label: 'Giao bài & Tiến độ', path: '/grading', roles: ['teacher', 'admin'] },
         { icon: <Library size={19} />, label: 'Ngân hàng Bài tập', path: '/exam-bank', roles: ['teacher', 'admin'] },
         { icon: <Database size={19} />, label: 'Ngân hàng Câu hỏi', path: '/question-bank', roles: ['teacher', 'admin'] },
         { icon: <FolderOpen size={19} />, label: 'Kho Học liệu Số', path: '/resources', roles: ['teacher', 'admin'] },
@@ -63,7 +67,16 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       title: 'HỆ THỐNG',
       roles: ['admin'],
       items: [
+        { icon: <BarChart3 size={19} />, label: 'Quản lý Số liệu Chi tiết', path: '/admin-analytics', roles: ['admin'] },
         { icon: <Shield size={19} />, label: 'Quản lý Người dùng', path: '/user-management', roles: ['admin'] },
+      ]
+    },
+    {
+      title: 'KHOA HỌC KỸ THUẬT',
+      roles: ['student', 'teacher', 'admin'],
+      items: [
+        { icon: <Award size={19} />, label: 'Báo cáo KHKT Dự án', path: 'https://drive.google.com/file/d/1XTo9OtOVqcLvXoa31zOGYAlkeACGy7-k/view?usp=sharing', roles: ['student', 'teacher', 'admin'], isExternal: true },
+        { icon: <FileText size={19} />, label: 'Cổng Dữ liệu KHKT', path: 'http://localhost:5174', roles: ['student', 'teacher', 'admin'], isExternal: true }
       ]
     },
     {
@@ -135,6 +148,25 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 {visibleItems.map((item) => {
                   const isActive = location.pathname === item.path ||
                     (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+                  if ((item as any).isExternal) {
+                    return (
+                      <a 
+                        key={item.label} 
+                        href={item.path} 
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={handleNavClick}
+                        className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 group text-[13.5px] font-heading text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white font-medium border border-transparent"
+                      >
+                        <div className="transition-transform duration-150 group-hover:scale-105 shrink-0 text-slate-400 group-hover:text-blue-500">
+                          {item.icon}
+                        </div>
+                        <span className="flex-1 truncate">{item.label}</span>
+                        <ExternalLink size={13} className="text-slate-400 opacity-60 group-hover:opacity-100" />
+                      </a>
+                    );
+                  }
+
                   return (
                     <Link 
                       key={item.label} 

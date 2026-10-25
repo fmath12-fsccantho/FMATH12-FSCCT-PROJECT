@@ -104,15 +104,15 @@ const Profile = () => {
       {/* ==========================================
           PHẦN HEADER & THÔNG TIN CHUNG
           ========================================== */}
-      <div className="bg-white border-b border-[#dee2e6]">
+      <div className="bg-white dark:bg-slate-900 border-b border-[#dee2e6] dark:border-slate-800">
         {/* Banner Cover (Màu phẳng) */}
-        <div className="h-32 md:h-48 w-full bg-[#e7f1ff] border-b border-[#b6d4fe]"></div>
+        <div className="h-32 md:h-48 w-full bg-[#e7f1ff] dark:bg-slate-800 border-b border-[#b6d4fe] dark:border-slate-700"></div>
         
         <div className="max-w-5xl mx-auto px-4 md:px-8 relative pb-8">
           <div className="flex flex-col md:flex-row gap-6 items-center md:items-end -mt-16 md:-mt-20 mb-6">
             {/* Avatar */}
-            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white p-1.5 border border-[#dee2e6] shadow-sm shrink-0">
-              <div className="w-full h-full rounded-full bg-[#f8f9fa] border border-[#e9ecef] flex items-center justify-center overflow-hidden font-black text-4xl text-[#adb5bd]">
+            <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white dark:bg-slate-900 p-1.5 border border-[#dee2e6] dark:border-slate-700 shadow-sm shrink-0">
+              <div className="w-full h-full rounded-full bg-[#f8f9fa] dark:bg-slate-800 border border-[#e9ecef] dark:border-slate-700 flex items-center justify-center overflow-hidden font-black text-4xl text-[#adb5bd] dark:text-slate-400">
                 {currentUser.avatar_url ? (
                   <img src={currentUser.avatar_url} className="w-full h-full object-cover" alt="Avatar"/>
                 ) : (
@@ -136,10 +136,10 @@ const Profile = () => {
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold font-heading text-[#212529] mb-1">
+              <h1 className="text-2xl md:text-3xl font-bold font-heading text-[#212529] dark:text-white mb-1">
                 {currentUser.full_name || currentUser.name}
               </h1>
-              <div className="text-[#6c757d] text-[14px] font-medium flex items-center justify-center md:justify-start gap-1.5">
+              <div className="text-[#6c757d] dark:text-slate-400 text-[14px] font-medium flex items-center justify-center md:justify-start gap-1.5">
                 <Mail size={14}/> {currentUser.email}
               </div>
             </div>
@@ -147,33 +147,33 @@ const Profile = () => {
 
           {/* Các chỉ số Thống kê */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white border border-[#dee2e6] rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
+            <div className="bg-white dark:bg-slate-900 border border-[#dee2e6] dark:border-slate-800 rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
               <div className="w-12 h-12 rounded-lg bg-[#fff3cd] text-[#ffc107] flex items-center justify-center shrink-0 border border-[#ffecb5]">
                 <Trophy size={24} />
               </div>
               <div>
                 <div className="text-[12px] font-bold text-[#6c757d] uppercase tracking-wider mb-0.5">Cấp độ hiện tại</div>
-                <div className="text-2xl font-black text-[#212529] font-ui leading-none">Level {currentUser.level || 1}</div>
+                <div className="text-2xl font-black text-[#212529] dark:text-white font-ui leading-none">Level {currentUser.level || 1}</div>
               </div>
             </div>
 
-            <div className="bg-white border border-[#dee2e6] rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
+            <div className="bg-white dark:bg-slate-900 border border-[#dee2e6] dark:border-slate-800 rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
               <div className="w-12 h-12 rounded-lg bg-[#e7f1ff] text-primary flex items-center justify-center shrink-0 border border-[#b6d4fe]">
                 <Flame size={24} />
               </div>
               <div>
                 <div className="text-[12px] font-bold text-[#6c757d] uppercase tracking-wider mb-0.5">Điểm kinh nghiệm</div>
-                <div className="text-2xl font-black text-[#212529] font-ui leading-none">{currentUser.xp || 0} <span className="text-[14px] font-bold text-[#adb5bd]">XP</span></div>
+                <div className="text-2xl font-black text-[#212529] dark:text-white font-ui leading-none">{currentUser.xp || 0} <span className="text-[14px] font-bold text-[#adb5bd]">XP</span></div>
               </div>
             </div>
 
-            <div className="bg-white border border-[#dee2e6] rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
+            <div className="bg-white dark:bg-slate-900 border border-[#dee2e6] dark:border-slate-800 rounded-xl p-5 flex items-center gap-4 shadow-sm hover:border-[#b6d4fe] transition-colors">
               <div className="w-12 h-12 rounded-lg bg-[#d1e7dd] text-[#198754] flex items-center justify-center shrink-0 border border-[#a3cfbb]">
                 <Calendar size={24} />
               </div>
               <div>
                 <div className="text-[12px] font-bold text-[#6c757d] uppercase tracking-wider mb-0.5">Chuỗi học tập</div>
-                <div className="text-2xl font-black text-[#212529] font-ui leading-none">{currentUser.streak || 0} <span className="text-[14px] font-bold text-[#adb5bd]">Ngày</span></div>
+                <div className="text-2xl font-black text-[#212529] dark:text-white font-ui leading-none">{currentUser.streak || 0} <span className="text-[14px] font-bold text-[#adb5bd]">Ngày</span></div>
               </div>
             </div>
           </div>
@@ -186,7 +186,7 @@ const Profile = () => {
       <div className="max-w-5xl mx-auto px-4 md:px-8 mt-6">
         
         {/* Thanh Tabs */}
-        <div className="flex items-center gap-2 border-b border-[#dee2e6] mb-6 overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-2 border-b border-[#dee2e6] dark:border-slate-800 mb-6 overflow-x-auto custom-scrollbar">
           <button 
             onClick={() => setActiveTab('history')} 
             className={`px-5 py-3 font-semibold text-[14px] flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-[#6c757d] hover:text-[#212529] hover:border-[#adb5bd]'}`}
@@ -202,13 +202,13 @@ const Profile = () => {
         </div>
 
         {/* Nội dung Tab */}
-        <div className="bg-white border border-[#dee2e6] rounded-xl shadow-sm overflow-hidden min-h-[400px]">
+        <div className="bg-white dark:bg-slate-900 border border-[#dee2e6] dark:border-slate-800 rounded-xl shadow-sm overflow-hidden min-h-[400px]">
           
           {/* TAB: LỊCH SỬ LÀM BÀI */}
           {activeTab === 'history' && (
             <div className="animate-in fade-in">
-              <div className="px-6 py-5 border-b border-[#dee2e6] bg-[#f8f9fa] flex items-center justify-between">
-                <h3 className="font-bold text-[#212529] text-[15px] uppercase tracking-wider flex items-center gap-2 font-heading">
+              <div className="px-6 py-5 border-b border-[#dee2e6] bg-[#f8f9fa] dark:bg-slate-800 flex items-center justify-between">
+                <h3 className="font-bold text-[#212529] dark:text-white text-[15px] uppercase tracking-wider flex items-center gap-2 font-heading">
                   <BookOpen size={18}/> Lịch sử thi & luyện tập
                 </h3>
               </div>
@@ -233,7 +233,7 @@ const Profile = () => {
                           <CheckCircle2 size={20} />
                         </div>
                         <div>
-                          <h4 className="font-bold text-[#212529] text-[15px] mb-1 line-clamp-1">{attempt.exams?.title || 'Bài thi không xác định'}</h4>
+                          <h4 className="font-bold text-[#212529] dark:text-white text-[15px] mb-1 line-clamp-1">{attempt.exams?.title || 'Bài thi không xác định'}</h4>
                           <div className="flex flex-wrap items-center gap-3 text-[12px] font-medium text-[#6c757d]">
                             <span className="bg-[#f8f9fa] border border-[#dee2e6] px-2 py-0.5 rounded uppercase tracking-wider">{attempt.exams?.type || 'Luyện tập'}</span>
                             <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(attempt.created_at).toLocaleString('vi-VN')}</span>

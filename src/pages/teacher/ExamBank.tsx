@@ -303,7 +303,12 @@ const ExamBank = () => {
       alert(`Nhân bản thành công! Đề thi riêng "${newTitle}" đã được thêm vào kho đề của Thầy/Cô.`);
       navigate('/exam-editor', { state: { examId: newExam.id } });
     } catch (err: any) {
-      alert("Lỗi khi nhân bản đề: " + err.message);
+      console.error("Lỗi khi nhân bản đề:", err);
+      if (err?.message?.includes('row-level security') || err?.code === '42501') {
+        alert("Lỗi nhân bản: Bảng 'exams' trên Supabase đang bật Row-Level Security (RLS) chặn ghi dữ liệu.\n\nCách xử lý nhanh nhất (30 giây):\nVào Supabase Dashboard -> SQL Editor -> Chạy câu lệnh:\nALTER TABLE exams DISABLE ROW LEVEL SECURITY;");
+      } else {
+        alert("Lỗi khi nhân bản đề: " + err.message);
+      }
     } finally {
       setIsLoading(false);
     }

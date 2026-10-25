@@ -20,10 +20,13 @@ const ClassManager = lazy(() => import('./pages/teacher/ClassManager'));
 const QuestionBank = lazy(() => import('./pages/teacher/QuestionBank'));
 const ExamBank = lazy(() => import('./pages/teacher/ExamBank'));
 const ExamCreator = lazy(() => import('./pages/teacher/ExamCreator'));
+const ContentCreator = lazy(() => import('./pages/teacher/ContentCreator'));
+const AssignmentGrader = lazy(() => import('./pages/teacher/AssignmentGrader'));
 const TheoryEditor = lazy(() => import('./pages/teacher/TheoryEditor'));
 const ExamEditor = lazy(() => import('./pages/teacher/ExamEditor'));
 
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
+const AdminAnalyticsPage = lazy(() => import('./pages/admin/AdminAnalyticsPage'));
 
 const FullPageLoading = () => (
   <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md select-none animate-in fade-in">
@@ -100,11 +103,10 @@ function App() {
           <Route path="/question-bank" element={<QuestionBank />} />
           <Route path="/exam-bank" element={<ExamBank />} />
           <Route path="/exam-creator" element={<ExamCreator />} />
+          <Route path="/content-creator" element={<ContentCreator />} />
+          <Route path="/grading" element={<AssignmentGrader />} />
           <Route path="/theory-editor/:lessonId" element={<TheoryEditor />} /> 
           <Route path="/exam-editor" element={<ExamEditor />} />
-          
-          <Route path="/user-management" element={<UserManagement />} />
-          <Route path="/grading" element={<PlaceholderPage title="Chấm điểm & Giao bài" />} />
         </Route>
       </Routes>
     </Router>

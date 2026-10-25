@@ -33,6 +33,21 @@
     <meta name="twitter:title" content="FMATH12 — Nền tảng học Toán 12 thông minh, miễn phí" />
     <meta name="twitter:description" content="Học Toán 12 hiệu quả hơn cùng AI. Lộ trình cá nhân hóa, trợ lý giải toán thông minh và kho đề ôn thi chuẩn GDPT 2018." />
     <meta name="twitter:image" content="/og-thumbnail.jpg" />
+
+    <!-- Script áp dụng Dark Mode tức thì chống giật sáng khi load trang -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (saved === 'dark' || (!saved && prefersDark)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-800 antialiased selection:bg-blue-600 selection:text-white">
     <div id="root"></div>

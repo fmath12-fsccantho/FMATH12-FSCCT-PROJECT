@@ -14,6 +14,7 @@ import { supabase } from '../../config/supabase';
 import { useAppStore, useExamStore } from '../../store/useAppStore';
 import { askGroqAI } from '../../services/groqAI';
 import { calculateStreakUpdate } from '../../utils/streakUtils';
+import { SUPPLEMENTAL_SYSTEM_EXAMS } from '../../config/systemExams';
 
 // --- HÀM TIỆN ÍCH ---
 const getQuestionType = (q: any) => {
@@ -98,20 +99,53 @@ const QuizTaking = () => {
 
       setIsPreparing(true);
       try {
-        const { data: fetchedExam, error: examError } = await supabase.from('exams').select('*').eq('id', id).single();
-        if (examError || !fetchedExam) throw new Error("Không thể tải dữ liệu đề thi.");
+        let fetchedExam: any = null;
+        let extractedQuestions: any[] = [];
 
-        const { data: eqData, error: qError } = await supabase
-          .from('exam_questions')
-          .select('sort_order, exercises(*)')
-          .eq('exam_id', id)
-          .order('sort_order', { ascending: true });
+        // 1. Kiểm tra session đề ngẫu nhiên Ma trận 2026 hoặc Đề khắc phục lỗi sai
+        const cachedCustom = sessionStorage.getItem(`fmath_custom_exam_${id}`);
+        if (cachedCustom) {
+          try {
+            const parsed = JSON.parse(cachedCustom);
+            fetchedExam = parsed.exam;
+            extractedQuestions = parsed.questions || [];
+          } catch (e) {}
+        }
 
-        if (qError) throw new Error("Lỗi tải danh sách câu hỏi.");
+        // 2. Kiểm tra bộ đề bổ sung chuẩn hệ thống (SUPPLEMENTAL_SYSTEM_EXAMS)
+        if (!fetchedExam) {
+          const sysExam = SUPPLEMENTAL_SYSTEM_EXAMS.find(e => e.id === id);
+          if (sysExam) {
+            fetchedExam = {
+              id: sysExam.id,
+              title: sysExam.title,
+              description: sysExam.description,
+              time_limit: (sysExam.duration || 90) * 60,
+              total_marks: 10
+            };
+            const { data: exData } = await supabase.from('exercises').select('*').limit(34);
+            extractedQuestions = exData || [];
+          }
+        }
+
+        // 3. Nếu chưa có, tải từ Supabase exams table
+        if (!fetchedExam) {
+          const { data, error: examError } = await supabase.from('exams').select('*').eq('id', id).single();
+          if (examError || !data) throw new Error("Không thể tải dữ liệu đề thi.");
+          fetchedExam = data;
+
+          const { data: eqData, error: qError } = await supabase
+            .from('exam_questions')
+            .select('sort_order, exercises(*)')
+            .eq('exam_id', id)
+            .order('sort_order', { ascending: true });
+
+          if (qError) throw new Error("Lỗi tải danh sách câu hỏi.");
+          extractedQuestions = eqData?.map((item: any) => item.exercises).filter(Boolean) || [];
+        }
 
         if (isMounted) {
           setExamData(fetchedExam);
-          const extractedQuestions = eqData?.map((item: any) => item.exercises).filter(Boolean) || [];
           setQuestions(extractedQuestions);
 
           let restoredTime = fetchedExam.time_limit || 2400;
@@ -384,28 +418,46 @@ const QuizTaking = () => {
     }
 
     if (currentUser?.id && id) {
-      const { data: attempt } = await supabase
-        .from('exam_attempts')
-        .insert({ 
-          exam_id: examData.id, 
-          user_id: currentUser.id, 
-          score: totalScore, 
-          time_spent: timeSpent > 0 ? timeSpent : 0 
-        })
-        .select()
-        .single();
-      
-      if (attempt) {
-        await supabase.from('exam_logs').insert({
-          session_id: sessionId || null,
-          student_id: currentUser.id,
-          action: 'SUBMIT_ANSWERS',
-          description: JSON.stringify({
-            exam_id: examData.id,
-            attempt_id: attempt.id,
-            answers: answers
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isDbExam = examData?.id && uuidRegex.test(examData.id);
+
+      if (isDbExam) {
+        const { data: attempt } = await supabase
+          .from('exam_attempts')
+          .insert({ 
+            exam_id: examData.id, 
+            user_id: currentUser.id, 
+            score: totalScore, 
+            time_spent: timeSpent > 0 ? timeSpent : 0 
           })
-        });
+          .select()
+          .single();
+        
+        if (attempt) {
+          await supabase.from('exam_logs').insert({
+            session_id: sessionId || null,
+            student_id: currentUser.id,
+            action: 'SUBMIT_ANSWERS',
+            description: JSON.stringify({
+              exam_id: examData.id,
+              attempt_id: attempt.id,
+              answers: answers
+            })
+          });
+        }
+      } else {
+        try {
+          const historyKey = `fmath_attempts_${currentUser.id}`;
+          const localHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
+          localHistory.unshift({
+            exam_id: examData?.id || id,
+            exam_title: examData?.title || 'Đề luyện tập Ma trận 2026',
+            score: totalScore,
+            time_spent: timeSpent > 0 ? timeSpent : 0,
+            created_at: new Date().toISOString()
+          });
+          localStorage.setItem(historyKey, JSON.stringify(localHistory.slice(0, 50)));
+        } catch(e) {}
       }
       
       // Báo nộp bài cho Giám thị
@@ -439,42 +491,37 @@ const QuizTaking = () => {
     clearCache(); 
   };
 
-  const handleAskQuestionAI = async (q: any) => {
-    const input = chatInputs[q.id];
+  const handleAskQuestionAI = async (q: any, customPrompt?: string) => {
+    const input = customPrompt || chatInputs[q.id];
     if (!input?.trim() || isAiReplying[q.id]) return;
     const newHistory = [...(chatHistory[q.id] || []), { role: 'user', content: input }];
     setChatHistory(prev => ({ ...prev, [q.id]: newHistory }));
-    setChatInputs(prev => ({ ...prev, [q.id]: "" }));
+    if (!customPrompt) {
+      setChatInputs(prev => ({ ...prev, [q.id]: "" }));
+    }
     setIsAiReplying(prev => ({ ...prev, [q.id]: true }));
     try {
+      const studentCurrentAns = answers[q.id] ? JSON.stringify(answers[q.id]) : 'Chưa chọn';
       const sysPrompt = `================================================================================
-BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 CHUẨN BỘ GIÁO DỤC & ĐÀO TẠO
+BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 THEO PHƯƠNG PHÁP SOCRATIC
 ================================================================================
-[THÔNG TIN CÂU HỎI LUYỆN TẬP]
+[THÔNG TIN BÀI TOÁN]
 - Đề bài câu hỏi: "${q.content}"
 - Đáp án đúng của hệ thống: "${q.correct_answer}"
 - Lời giải tham khảo: "${q.explanation || ''}"
+- Lựa chọn hiện tại của học sinh: ${studentCurrentAns}
 
-[QUY TẮC SƯ PHẠM DẪN DẮT TỪNG BƯỚC]
-1. TUYỆT ĐỐI KHÔNG giải hộ hay đưa ra kết quả cuối cùng (ví dụ: A, B, C, D) cho học sinh một cách thụ động ngay từ câu trả lời đầu tiên. Hãy ưu tiên gợi mở bản chất hoặc dẫn dắt bước đầu.
-2. TUYỆT ĐỐI KHÔNG dùng các từ ngữ kỹ thuật như "Scaffolding", "giàn giáo", "đơn thuốc", "nấc" trong câu trả lời cho học sinh.
-3. Trình bày các bước tư duy siêu cấu trúc. Phân tách rõ ràng từng bước bằng tiêu đề in đậm viết hoa \`### BƯỚC 1: [TÊN BƯỚC]\`, \`### BƯỚC 2: [TÊN BƯỚC]\`...
-4. Tại mỗi bước tư duy, trình bày theo khuôn mẫu:
-   - **Bản chất ý tưởng**: Giải thích ngắn gọn mục đích thực hiện của bước này.
-   - **Công thức áp dụng**: Trình bày rõ ràng công thức toán học dưới dạng LaTeX \`$...$\` hoặc \`$$...$$\`.
-   - **Câu hỏi gợi mở trung gian**: Đặt 1 câu hỏi ngắn để yêu cầu học sinh tự tính toán bước phụ trước khi tiết lộ tiếp (Ví dụ: "Đạo hàm f'(x) bằng bao nhiêu nhỉ?", "Hệ số a ở đây âm hay dương?").
-5. Chia nhỏ quá trình giải bài thành từng bước nhỏ để học sinh tự hoàn thành. Không viết nguyên khối văn bản dài. Dùng danh sách và xuống dòng hợp lý.
-
-[QUY TẮC CHỐNG ẢO GIÁC & GIỚI HẠN PHẠM VI (GUARDRAILS)]
-1. PHẠM VI KIẾN THỨC: Chỉ tập trung thảo luận về câu hỏi Toán học đang làm.
-2. TỪ CHỐI LỊCH SỰ: Nếu học sinh hỏi các câu hỏi ngoài lề (văn học, xã hội, lập trình, tán gẫu, v.v.), bạn bắt buộc phải trả lời: 
-   "Thầy là trợ lý chuyên sâu môn Toán 12 của FMATH12. Thầy chỉ có thể giúp em tháo gỡ các vấn đề liên quan đến môn Toán học thôi nhé. Hãy quay lại chủ đề bài học nào!"
-3. TUYỆT ĐỐI KHÔNG được bịa công thức hay các định lý giả tưởng.
-4. ĐỊNH DẠNG TOÁN HỌC: Mọi công thức Toán học bắt buộc bọc trong $...$ hoặc $$...$$.
-
-[TÔNG GIỌNG & PHONG CÁCH]
-- Sử dụng xưng hô: "Thầy" - "Em".
-- Ngắn gọn, đi thẳng vào vấn đề cốt lõi của câu hỏi.
+[QUY TẮC SƯ PHẠM DẪN DẮT TỪNG BƯỚC - TUYỆT ĐỐI KHÔNG GIẢI HỘ]
+1. TUYỆT ĐỐI KHÔNG giải hộ hay đưa ra kết quả cuối cùng (ví dụ: A, B, C, D hoặc con số cụ thể) cho học sinh một cách thụ động. 
+2. NẾU HỌC SINH HỎI GỢI Ý BƯỚC ĐẦU:
+   - Chỉ chỉ ra hướng tiếp cận, bản chất hình học/đại số.
+   - Nêu câu hỏi gợi mở để học sinh tự đặt bút làm bước 1.
+3. NẾU HỌC SINH HỎI PHÂN TÍCH LỖI SAI:
+   - Chỉ ra các bẫy đề kinh điển (quên điều kiện xác định, nhầm dấu đạo hàm, nhầm vectơ pháp tuyến với chỉ phương, chia cho 0,...).
+   - Hỏi học sinh xem mình có bỏ sót điều kiện nào không.
+4. Trình bày các bước tư duy siêu cấu trúc. Phân tách rõ ràng từng bước bằng tiêu đề in đậm \`### BƯỚC 1: [TÊN BƯỚC]\`...
+5. Mọi công thức Toán học bắt buộc bọc trong $...$ hoặc $$...$$.
+6. Xưng hô Thầy - Em thân thiện, tôn trọng và khích lệ tư duy độc lập.
 ================================================================================`;
 
       const aiReply = await askGroqAI(sysPrompt, input, false, newHistory);
@@ -700,47 +747,144 @@ BẠN LÀ FMATH12 AI TUTOR - CHUYÊN GIA SƯ PHẠM TOÁN 12 CHUẨN BỘ GIÁO 
               )}
             </div>
 
-            {result && (q.explanation || true) && (
-              <div className="mt-10 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs animate-in slide-in-from-bottom-4">
-                <div className="flex flex-wrap justify-between items-center gap-4 px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-[15px] uppercase font-heading tracking-wider"><BookOpen size={18} className="text-indigo-600 dark:text-indigo-400" /> Lời Giải Chi Tiết</div>
-                  <button onClick={() => setOpenChatId(openChatId === q.id ? null : q.id)} className={`px-4 py-2 rounded-xl text-[13px] font-bold flex items-center gap-2 transition-colors border shadow-2xs cursor-pointer ${openChatId === q.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'}`}><MessageSquare size={14} /> {openChatId === q.id ? 'Đóng AI Chat' : 'Hỏi AI câu này'}</button>
+            {/* Trợ lý AI Socratic & Lời giải */}
+            <div className="mt-8 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xs animate-in slide-in-from-bottom-3">
+              <div className="flex flex-wrap justify-between items-center gap-3 px-5 py-3.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-bold text-sm uppercase font-heading tracking-wider">
+                  <BrainCircuit size={17} className="text-blue-600 dark:text-blue-400" />
+                  <span>Trợ Lý Sư Phạm Socratic AI</span>
+                  <span className="text-[11px] font-medium text-slate-400 lowercase font-sans">(không giải hộ • gợi ý từng bước)</span>
                 </div>
-                
-                <div className="p-6 prose prose-sm max-w-none text-slate-750 dark:text-slate-300 leading-[2] overflow-x-auto [&_.katex-display]:my-4">
-                  {q.explanation ? <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{q.explanation}</ReactMarkdown> : <div className="text-center text-slate-400 italic py-4">Câu hỏi này chưa có lời giải chi tiết. Hãy dùng tính năng "Hỏi AI" bên trên nhé!</div>}
-                </div>
-
-                {openChatId === q.id && (
-                  <div className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-5 animate-in slide-in-from-top-2">
-                    <div className="space-y-4 mb-4 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
-                      {(!chatHistory[q.id] || chatHistory[q.id].length === 0) ? (
-                        <div className="text-center py-8"><BrainCircuit size={40} className="mx-auto text-blue-400 mb-3" /><div className="text-slate-500 text-[14px] font-medium">Bạn chưa hiểu bước nào? Hãy hỏi FMATH12 AI để được hướng dẫn chi tiết từng bước nhé!</div></div>
-                      ) : (
-                        chatHistory[q.id].map((msg, idx) => (
-                          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.role === 'ai' && <div className="shrink-0 w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mr-2 shadow-2xs"><BrainCircuit size={16} /></div>}
-                            <div className={`max-w-[85%] rounded-2xl p-4 text-[14px] leading-[1.8] shadow-2xs ${msg.role === 'user' ? 'bg-indigo-600 text-white font-medium rounded-tr-sm' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-tl-sm'}`}>
-                              {msg.role === 'user' ? msg.content : <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 [&_.katex-display]:my-2"><ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{msg.content}</ReactMarkdown></div>}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                      {isAiReplying[q.id] && (
-                        <div className="flex justify-start items-center mt-2">
-                          <div className="shrink-0 w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 mr-2 shadow-2xs"><BrainCircuit size={16} /></div>
-                          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3.5 rounded-2xl rounded-tl-sm text-slate-400 flex items-center shadow-2xs"><Loader2 size={18} className="animate-spin text-indigo-600" /></div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-end gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1.5 shadow-2xs focus-within:border-indigo-500 transition-colors">
-                      <textarea rows={1} value={chatInputs[q.id] || ""} onChange={(e) => setChatInputs(prev => ({...prev, [q.id]: e.target.value}))} onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskQuestionAI(q); } }} placeholder="Nhập thắc mắc của bạn tại đây..." className="flex-1 bg-transparent px-3 py-2.5 outline-none text-[14px] text-slate-900 dark:text-white resize-none max-h-24 custom-scrollbar" disabled={isAiReplying[q.id]} />
-                      <button onClick={() => handleAskQuestionAI(q)} disabled={isAiReplying[q.id] || !chatInputs[q.id]?.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg transition-colors disabled:opacity-50 shrink-0 mb-0.5 mr-0.5 cursor-pointer"><Send size={18} /></button>
-                    </div>
-                  </div>
-                )}
+                <button 
+                  onClick={() => setOpenChatId(openChatId === q.id ? null : q.id)} 
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors border shadow-2xs cursor-pointer ${
+                    openChatId === q.id 
+                      ? 'bg-blue-600 text-white border-blue-600' 
+                      : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                  }`}
+                >
+                  <MessageSquare size={13} /> {openChatId === q.id ? 'Thu gọn AI' : 'Hỏi Trợ lý AI'}
+                </button>
               </div>
-            )}
+
+              {/* Lời giải chi tiết khi đã nộp bài */}
+              {result && (
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 font-heading flex items-center gap-1.5">
+                    <BookOpen size={14} className="text-indigo-600" /> Lời giải chi tiết
+                  </div>
+                  <div className="prose prose-sm max-w-none text-slate-750 dark:text-slate-300 leading-relaxed overflow-x-auto [&_.katex-display]:my-3">
+                    {q.explanation ? (
+                      <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
+                        {q.explanation}
+                      </ReactMarkdown>
+                    ) : (
+                      <div className="text-slate-400 italic text-xs py-2">Câu hỏi này chưa có lời giải mẫu. Bấm "Hỏi Trợ lý AI" bên trên để nhận phân tích phương pháp nhé!</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Khung chat Socratic AI Tutor */}
+              {openChatId === q.id && (
+                <div className="bg-slate-50/70 dark:bg-slate-800/40 p-4 sm:p-5 border-t border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  
+                  {/* 3 Quick Chips Socratic */}
+                  <div className="flex flex-wrap items-center gap-2 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAskQuestionAI(q, "Thầy hãy gợi ý bước đầu và phương hướng tiếp cận bài này giúp em, xin đừng giải hộ hay nói đáp án nhé!")}
+                      disabled={isAiReplying[q.id]}
+                      className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-semibold hover:bg-blue-100 transition-colors cursor-pointer"
+                    >
+                      💡 Gợi ý bước đầu (Bản chất)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAskQuestionAI(q, "Thầy hãy phân tích các lỗi sai và bẫy tư duy mà học sinh dễ mắc phải ở câu này để em tự kiểm tra lại!")}
+                      disabled={isAiReplying[q.id]}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[11px] font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
+                    >
+                      🔍 Phân tích lỗi sai & bẫy đề
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAskQuestionAI(q, "Thầy nhắc lại công thức và định lý cốt lõi cần dùng cho dạng bài này với ạ!")}
+                      disabled={isAiReplying[q.id]}
+                      className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-semibold hover:bg-purple-100 transition-colors cursor-pointer"
+                    >
+                      📐 Công thức & Định lý cốt lõi
+                    </button>
+                  </div>
+
+                  {/* Lịch sử hội thoại */}
+                  <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
+                    {(!chatHistory[q.id] || chatHistory[q.id].length === 0) ? (
+                      <div className="text-center py-6">
+                        <BrainCircuit size={32} className="mx-auto text-blue-400 mb-2 opacity-70" />
+                        <div className="text-slate-500 text-xs font-medium">
+                          Em chưa rõ bước nào? Chọn một gợi ý nhanh bên trên hoặc nhắn tin để Thầy hướng dẫn từng bước nhé!
+                        </div>
+                      </div>
+                    ) : (
+                      chatHistory[q.id].map((msg, idx) => (
+                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          {msg.role === 'ai' && (
+                            <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center mr-2 shadow-2xs mt-0.5">
+                              <BrainCircuit size={14} />
+                            </div>
+                          )}
+                          <div className={`max-w-[85%] rounded-2xl p-3.5 text-xs sm:text-sm leading-relaxed shadow-2xs ${
+                            msg.role === 'user' 
+                              ? 'bg-blue-600 text-white font-medium rounded-tr-sm' 
+                              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-tl-sm'
+                          }`}>
+                            {msg.role === 'user' ? msg.content : (
+                              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 [&_.katex-display]:my-2">
+                                <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
+                                  {msg.content}
+                                </ReactMarkdown>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {isAiReplying[q.id] && (
+                      <div className="flex justify-start items-center gap-2 mt-2">
+                        <div className="shrink-0 w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-2xs">
+                          <BrainCircuit size={14} />
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-2xl text-slate-400 flex items-center gap-2 shadow-2xs text-xs">
+                          <Loader2 size={14} className="animate-spin text-blue-600" />
+                          <span>Thầy đang phân tích và dẫn dắt từng bước...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input gửi tin nhắn */}
+                  <div className="flex items-end gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-2xs focus-within:border-blue-500 transition-colors">
+                    <textarea 
+                      rows={1} 
+                      value={chatInputs[q.id] || ""} 
+                      onChange={(e) => setChatInputs(prev => ({...prev, [q.id]: e.target.value}))} 
+                      onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskQuestionAI(q); } }} 
+                      placeholder="Em muốn Thầy gợi ý bước nào tiếp theo?..." 
+                      className="flex-1 bg-transparent px-3 py-2 outline-none text-xs sm:text-sm text-slate-900 dark:text-white resize-none max-h-24 custom-scrollbar" 
+                      disabled={isAiReplying[q.id]} 
+                    />
+                    <button 
+                      onClick={() => handleAskQuestionAI(q)} 
+                      disabled={isAiReplying[q.id] || !chatInputs[q.id]?.trim()} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                    >
+                      <Send size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

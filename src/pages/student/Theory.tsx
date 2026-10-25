@@ -47,7 +47,7 @@ const SCAFFOLDING_TIERS = [
   {
     tier: 4,
     title: 'Bậc 4: Giải mã Bẫy Đề Thi & Chinh Phục 9+',
-    badge: 'Đột phá',
+    badge: 'Nâng cao',
     color: 'rose',
     desc: 'Nhận diện các bẫy đề thi hay lừa, điểm mấu chốt tránh mất điểm oan và hướng tới điểm 9+.',
     prompt: 'Trong phần này học sinh thường hay mắc bẫy sai lầm nào nhất và cách nhận diện đề thi lừa đảo ra sao hả thầy?'

@@ -80,7 +80,10 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT 1 ĐỐI TƯỢNG JSON (không có markdown c
     const systemPrompt = "Bạn là Chuyên gia Khảo thí và Giảng dạy Toán học THPT của Bộ GD&ĐT Việt Nam. Bạn có khả năng phân tích ma trận đề thi và định vị chuẩn xác câu hỏi vào khung kiến thức GDPT 2018. Bạn chỉ trả về JSON thuần túy.";
 
     try {
-      const responseText = await askGroqAI(systemPrompt, prompt, true);
+      const responseText = await askGroqAI(systemPrompt, prompt, true, undefined, {
+        isInternal: true,
+        model: 'llama-3.1-8b-instant'
+      });
       if (responseText) {
         let cleanText = responseText.trim();
         if (cleanText.startsWith('```')) {
@@ -257,7 +260,10 @@ ${q.correct_answer ? `Đáp án: ${typeof q.correct_answer === 'object' ? JSON.s
 ]`;
 
       try {
-        const responseText = await askGroqAI(systemPrompt, promptItems, true);
+        const responseText = await askGroqAI(systemPrompt, promptItems, true, undefined, {
+          model: 'llama-3.1-8b-instant',
+          isInternal: true
+        });
         if (responseText) {
           let clean = responseText.trim();
           if (clean.startsWith('```')) {
@@ -285,10 +291,10 @@ ${q.correct_answer ? `Đáp án: ${typeof q.correct_answer === 'object' ? JSON.s
           }
         }
       } catch (err) {
-        console.warn("Lỗi phân tích chunk AI, dùng phân tích dự phòng tức thì:", err);
+        console.warn("Lỗi phân tích chunk AI, chuyển sang phân tích từ khóa dự phòng tức thì:", err);
       }
 
-      // Đảm bảo mọi câu hỏi trong chunk đều có kết quả (nếu AI sót thì dùng fallback)
+      // Đảm bảo mọi câu hỏi trong chunk đều có kết quả (nếu AI sót hoặc lỗi thì dùng fallback)
       chunk.items.forEach(item => {
         if (!results[item.globalIndex]) {
           const fallback = questionAiAnalyzer.fallbackAnalyze(item.q.content || '');
@@ -305,8 +311,16 @@ ${q.correct_answer ? `Đáp án: ${typeof q.correct_answer === 'object' ? JSON.s
       });
     };
 
-    // Chạy đồng thời các khối câu hỏi với Promise.all
-    await Promise.all(chunks.map(chunk => processChunk(chunk)));
+    // Chạy các khối câu hỏi theo từng đợt (Concurrency: 2) kèm khoảng nghỉ 100ms
+    // Giúp tối ưu hóa tốc độ cao nhưng tuyệt đối không làm quá tải giới hạn token (TPM)
+    const CONCURRENCY = 2;
+    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+      const batch = chunks.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(chunk => processChunk(chunk)));
+      if (i + CONCURRENCY < chunks.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
 
     // Tính toán Thống kê Ma trận đề thi (Matrix Summary)
     const levels = { nb: 0, th: 0, vd: 0, vdc: 0 };

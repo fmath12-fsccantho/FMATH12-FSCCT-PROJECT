@@ -20,6 +20,7 @@ import { askGroqAI } from '../../services/groqAI';
 import { fmathEngineService, CognitiveDiagnosticResult } from '../../services/fmathEngineService';
 import { CORE_TOPICS } from '../../config/curriculumFramework';
 import { MathGraphPlotter } from '../../components/common/MathGraphPlotter';
+import { CompetencyRadarChart } from '../../components/analytics/CompetencyRadarChart';
 
 const Dashboard = () => {
   const { currentUser } = useAppStore();
@@ -953,6 +954,18 @@ YÊU CẦU NỘI DUNG PHÂN TÍCH:
               </div>
             </div>
           )}
+
+          {/* ========================================================================= */}
+          {/* 3.5. BIỂU ĐỒ RADAR NĂNG LỰC 7 CHUYÊN ĐỀ & DỰ PHỎNG ĐIỂM THPT 2026          */}
+          {/* ========================================================================= */}
+          <CompetencyRadarChart
+            data={(diagnosticData?.radar && diagnosticData.radar.length > 0) ? diagnosticData.radar : skills}
+            predictedScore={diagnosticData?.predictedScore || '---'}
+            scoreRange={diagnosticData?.scoreRange || 'Đang cập nhật'}
+            onPracticeTopic={(topicName) => navigate('/quiz', { state: { activeTab: 'Chuyên đề', filterTopic: topicName } })}
+            onGenerateMatrixExam={() => navigate('/quiz', { state: { mode: 'matrix_2026' } })}
+            onFixWeaknesses={() => navigate('/quiz', { state: { mode: 'fix_errors' } })}
+          />
 
           {/* ========================================================================= */}
           {/* 4. KHỐI CHÍNH: BẢN ĐỒ THÍCH ỨNG & AI TUTOR WIDGET                         */}

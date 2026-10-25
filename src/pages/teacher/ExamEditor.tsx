@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Save, Image as ImageIcon, Loader2, 
   SplitSquareHorizontal, FileQuestion, Clock, 
   Copy, Check, CheckCircle2, AlertCircle,
-  BrainCircuit, Edit3, Database, Sparkles
+  BrainCircuit, Edit3, Database, Sparkles,
+  Plus, ArrowUp, ArrowDown, Trash2, Layers
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -15,6 +16,15 @@ import { supabase } from '../../config/supabase';
 import { useAppStore } from '../../store/useAppStore';
 import { canEditExam, isFptTeacherOrAdmin, canApproveExam } from '../../utils/permissionUtils';
 import { ExamBatchAnalysisModal } from '../../components/common/ExamBatchAnalysisModal';
+import { ExamMatrixSummary } from '../../components/teacher/ExamMatrixSummary';
+import { QuestionBankPickerModal } from '../../components/teacher/QuestionBankPickerModal';
+import { 
+  calculateQuestionMatrix, 
+  normalizeQuestionType, 
+  normalizeQuestionLevel,
+  QUESTION_FORMAT_LABELS,
+  COGNITIVE_LEVEL_LABELS
+} from '../../utils/examMatrixUtils';
 
 const AI_PROMPT = `Bạn là một chuyên gia Toán học và kỹ sư dữ liệu. 
 Nhiệm vụ: Đọc đề thi dưới đây. ĐẶC BIỆT LƯU Ý: Giáo viên đã cung cấp sẵn đáp án đúng trong đề (bằng cách gạch chân, in đậm, bôi đỏ, có dấu * ở phương án đúng, hoặc để bảng đáp án ở cuối file). 
@@ -116,13 +126,13 @@ const parseTFAnswerForEdit = (ans: any) => {
 
 // --- MARKDOWN COMPONENTS ---
 const MarkdownComponents = {
-  img: ({ node, ...props }: any) => <img {...props} className="max-w-full h-auto rounded border border-[#dee2e6] my-4 block shadow-sm" alt={props.alt || "Ảnh"} loading="lazy" />,
-  table: ({ node, ...props }: any) => <div className="w-full overflow-x-auto my-6 rounded-lg border border-[#dee2e6] shadow-sm bg-white"><table className="w-full text-center border-collapse text-[14px]" {...props} /></div>,
-  thead: ({ node, ...props }: any) => <thead className="bg-[#f8f9fa] border-b-2 border-[#dee2e6] text-[#212529]" {...props} />,
-  tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#dee2e6]" {...props} />,
-  tr: ({ node, ...props }: any) => <tr className="transition-colors hover:bg-[#f8f9fa]/50" {...props} />,
-  th: ({ node, ...props }: any) => <th className="p-3 border-r border-[#dee2e6] last:border-r-0 font-bold whitespace-nowrap align-middle" {...props} />,
-  td: ({ node, ...props }: any) => <td className="p-3 border-r border-[#dee2e6] last:border-r-0 align-middle first:font-bold first:bg-[#f8f9fa] first:border-r-2" {...props} />,
+  img: ({ node, ...props }: any) => <img {...props} className="max-w-full h-auto rounded border border-slate-200 dark:border-slate-800 my-4 block shadow-sm" alt={props.alt || "Ảnh"} loading="lazy" />,
+  table: ({ node, ...props }: any) => <div className="w-full overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"><table className="w-full text-center border-collapse text-[14px]" {...props} /></div>,
+  thead: ({ node, ...props }: any) => <thead className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100" {...props} />,
+  tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-slate-200 dark:divide-slate-800" {...props} />,
+  tr: ({ node, ...props }: any) => <tr className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50" {...props} />,
+  th: ({ node, ...props }: any) => <th className="p-3 border-r border-slate-200 dark:border-slate-800 last:border-r-0 font-bold whitespace-nowrap align-middle" {...props} />,
+  td: ({ node, ...props }: any) => <td className="p-3 border-r border-slate-200 dark:border-slate-800 last:border-r-0 align-middle first:font-bold first:bg-slate-50 dark:first:bg-slate-800 first:border-r-2" {...props} />,
 };
 
 const ExamEditor = () => {
@@ -150,6 +160,12 @@ const ExamEditor = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [isJsonCopied, setIsJsonCopied] = useState(false);
   const [showBatchAnalysisModal, setShowBatchAnalysisModal] = useState(false);
+  const [showBankPickerModal, setShowBankPickerModal] = useState(false);
+
+  // Tính toán ma trận số lượng câu hỏi trong đề
+  const matrixStats = useMemo(() => {
+    return calculateQuestionMatrix(parsedData || []);
+  }, [parsedData]);
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>(null);
@@ -222,7 +238,12 @@ const ExamEditor = () => {
       setTitle(newTitle);
       alert(`Đã nhân bản đề thi thành công! Thầy/Cô có toàn quyền chỉnh sửa và giao đề "${newTitle}" cho học sinh.`);
     } catch (err: any) {
-      alert("Lỗi khi nhân bản đề: " + err.message);
+      console.error("Lỗi nhân bản đề thi:", err);
+      if (err?.message?.includes('row-level security') || err?.code === '42501') {
+        alert("Lỗi nhân bản đề: Bảng 'exams' trên Supabase đang bật Row-Level Security (RLS) chặn ghi dữ liệu.\n\nVui lòng vào Supabase Dashboard -> SQL Editor -> Chạy câu lệnh:\nALTER TABLE exams DISABLE ROW LEVEL SECURITY;");
+      } else {
+        alert("Lỗi khi nhân bản đề: " + err.message);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -373,6 +394,69 @@ const ExamEditor = () => {
     if (!editExamId) setContent(JSON.stringify(newData, null, 2));
     setEditingIndex(null);
     setIsSavingEdit(false);
+  };
+
+  // Thêm danh sách câu hỏi được chọn từ Ngân hàng câu hỏi
+  const handleAddQuestionsFromBank = (newQuestions: any[]) => {
+    if (!newQuestions || newQuestions.length === 0) return;
+    const current = parsedData || [];
+    const updated = [...current, ...newQuestions];
+    setParsedData(updated);
+    if (!editExamId) setContent(JSON.stringify(updated, null, 2));
+    alert(`Đã thêm thành công ${newQuestions.length} câu hỏi từ Ngân hàng vào Đề thi!`);
+  };
+
+  // Thêm một câu hỏi mới rỗng trực tiếp để biên tập thủ công
+  const handleAddNewManualQuestion = (type: 'mcq' | 'tf' | 'saq') => {
+    const current = parsedData || [];
+    const newQ: any = {
+      id: `manual_${Date.now()}`,
+      type,
+      level: 'Thông hiểu',
+      content: 'Nhập nội dung câu hỏi mới tại đây...\n\n(Ví dụ: Cho hàm số $y = f(x)$...)',
+      options: type === 'mcq' ? [
+        { id: 'A', text: 'Phương án A' },
+        { id: 'B', text: 'Phương án B' },
+        { id: 'C', text: 'Phương án C' },
+        { id: 'D', text: 'Phương án D' },
+      ] : type === 'tf' ? [
+        { id: 'a', text: 'Mệnh đề ý a' },
+        { id: 'b', text: 'Mệnh đề ý b' },
+        { id: 'c', text: 'Mệnh đề ý c' },
+        { id: 'd', text: 'Mệnh đề ý d' },
+      ] : [],
+      correct_answer: type === 'mcq' ? 'A' : type === 'tf' ? { a: true, b: false, c: true, d: false } : '0',
+      explanation: 'Lời giải chi tiết...'
+    };
+
+    const updated = [...current, newQ];
+    setParsedData(updated);
+    if (!editExamId) setContent(JSON.stringify(updated, null, 2));
+    setEditingIndex(updated.length - 1);
+    setEditForm(JSON.parse(JSON.stringify(newQ)));
+  };
+
+  // Xóa câu hỏi khỏi đề thi
+  const handleDeleteQuestion = (indexToDelete: number) => {
+    if (!parsedData) return;
+    if (!window.confirm(`Thầy/Cô có chắc chắn muốn xóa Câu ${indexToDelete + 1} khỏi Đề thi không?`)) return;
+    const updated = parsedData.filter((_, idx) => idx !== indexToDelete);
+    setParsedData(updated);
+    if (!editExamId) setContent(JSON.stringify(updated, null, 2));
+    if (editingIndex === indexToDelete) setEditingIndex(null);
+  };
+
+  // Di chuyển thứ tự câu hỏi lên/xuống
+  const handleMoveQuestion = (index: number, direction: 'up' | 'down') => {
+    if (!parsedData) return;
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= parsedData.length) return;
+    const updated = [...parsedData];
+    const temp = updated[index];
+    updated[index] = updated[targetIdx];
+    updated[targetIdx] = temp;
+    setParsedData(updated);
+    if (!editExamId) setContent(JSON.stringify(updated, null, 2));
   };
 
   const recalculateScore = (userAnswers: any, gradingType: string) => {
@@ -550,22 +634,63 @@ const ExamEditor = () => {
       }
       setIsSaving(true);
       try {
-        const cleanTags = existingTags.filter(t => !t.startsWith('grading_type:'));
-        const newTags = [...cleanTags, `grading_type:${gradingType}`];
+        const cleanTags = existingTags.filter(t => !t.startsWith('grading_type:') && !t.includes('câu'));
+        const newTags = [...cleanTags, `${parsedData?.length || 0} câu`, `grading_type:${gradingType}`];
 
         const { error: updateError } = await supabase
           .from('exams')
-          .update({ tags: newTags })
+          .update({ 
+            title: title,
+            time_limit: timeLimit * 60,
+            tags: newTags 
+          })
           .eq('id', editExamId);
 
         if (updateError) throw updateError;
 
+        // Đồng bộ câu hỏi trong bảng exam_questions
+        if (parsedData && parsedData.length > 0) {
+          const { data: fallbackLesson } = await supabase.from('lessons').select('id').limit(1).maybeSingle();
+          const targetLessonId = fallbackLesson?.id || null;
+
+          const processedQuestionIds: string[] = [];
+          for (let i = 0; i < parsedData.length; i++) {
+            const q = parsedData[i];
+            if (!q.id || String(q.id).startsWith('manual_')) {
+              // Thêm câu hỏi mới vào bảng exercises
+              const { data: insData, error: insErr } = await supabase.from('exercises').insert({
+                lesson_id: targetLessonId,
+                content: q.content,
+                type: q.type || 'mcq',
+                level: q.level || 'Nhận biết',
+                options: q.options || [],
+                correct_answer: q.type === 'tf' && typeof q.correct_answer === 'object' ? JSON.stringify(q.correct_answer) : q.correct_answer || 'A',
+                explanation: q.explanation || '',
+                sort_order: i + 1
+              }).select('id').single();
+              if (insErr) throw insErr;
+              processedQuestionIds.push(insData.id);
+            } else {
+              processedQuestionIds.push(q.id);
+            }
+          }
+
+          // Cập nhật lại liên kết trong exam_questions
+          await supabase.from('exam_questions').delete().eq('exam_id', editExamId);
+          const eqPayload = processedQuestionIds.map((exId, idx) => ({
+            exam_id: editExamId,
+            exercise_id: exId,
+            sort_order: idx + 1
+          }));
+          await supabase.from('exam_questions').insert(eqPayload);
+        }
+
         await recalculateAllAttempts(editExamId, gradingType);
 
-        alert("Đã cập nhật cách chia điểm và tính toán lại toàn bộ kết quả bài làm của học sinh thành công!");
+        alert(`Đã lưu thành công Đề thi với ${parsedData?.length || 0} câu hỏi!`);
         navigate('/exam-bank');
       } catch (error: any) {
-        alert("Lỗi khi cập nhật cách chia điểm: " + error.message);
+        alert("Lỗi khi cập nhật đề thi: " + error.message);
       } finally {
         setIsSaving(false);
       }
@@ -611,7 +736,14 @@ const ExamEditor = () => {
       }
       navigate('/exam-bank', { state: { activeTab: 'Đề luyện thi' } });
 
-    } catch (error: any) { alert("Lỗi xuất bản: " + error.message); } 
+    } catch (error: any) { 
+      console.error("Lỗi xuất bản đề thi:", error);
+      if (error?.message?.includes('row-level security') || error?.code === '42501') {
+        alert("Lỗi xuất bản: Bảng 'exams' trên Supabase đang bật Row-Level Security (RLS) chặn ghi dữ liệu.\n\nCách xử lý nhanh nhất (30 giây):\nVào Supabase Dashboard -> SQL Editor -> Chạy câu lệnh:\nALTER TABLE exams DISABLE ROW LEVEL SECURITY;");
+      } else {
+        alert("Lỗi xuất bản: " + error.message); 
+      }
+    } 
     finally { setIsSaving(false); }
   };
 
@@ -644,13 +776,13 @@ const ExamEditor = () => {
       <input type="file" ref={fileInputEditRef} onChange={handleEditImageUpload} accept="image/*" className="hidden" />
 
       {/* HEADER BAR */}
-      <div className="bg-white border-b border-[#dee2e6] px-6 py-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 z-10 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-[#dee2e6] dark:border-slate-800 px-6 py-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 z-10 shadow-sm">
         <div className="flex items-center gap-4 flex-1">
           <Link to="/exam-bank" className="p-2 text-[#6c757d] hover:bg-[#e9ecef] rounded-lg transition-colors border border-transparent hover:border-[#dee2e6]">
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#f8f9fa] px-3 py-2 rounded-lg flex-1 min-w-[200px] max-w-md border border-[#dee2e6] focus-within:border-primary focus-within:ring-2 focus-within:ring-[#e7f1ff] transition-all">
+            <div className="flex items-center gap-2 bg-[#f8f9fa] dark:bg-slate-800 px-3 py-2 rounded-lg flex-1 min-w-[200px] max-w-md border border-[#dee2e6] dark:border-slate-700 focus-within:border-primary focus-within:ring-2 focus-within:ring-[#e7f1ff] transition-all">
               <FileQuestion size={16} className="text-primary shrink-0"/>
               <input 
                 type="text" 
@@ -799,7 +931,67 @@ const ExamEditor = () => {
         )}
 
         {/* CỘT PHẢI: XEM TRƯỚC VÀ CHỈNH SỬA TRỰC QUAN */}
-        <div className={`flex-1 bg-[#f8f9fa] overflow-y-auto custom-scrollbar p-4 md:p-8 relative ${editExamId ? 'w-full max-w-5xl mx-auto' : ''}`}>
+        <div className={`flex-1 bg-[#f8f9fa] dark:bg-slate-950 overflow-y-auto custom-scrollbar p-4 md:p-8 relative ${editExamId ? 'w-full max-w-5xl mx-auto' : ''}`}>
+          
+          {/* MA TRẬN SỐ LƯỢNG CÂU HỎI */}
+          <ExamMatrixSummary 
+            stats={matrixStats} 
+            targetStandard={gradingType === 'standard'}
+            className="mb-6"
+          />
+
+          {/* THANH CÔNG CỤ QUẢN LÝ CÂU HỎI TRONG ĐỀ */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-xs">
+            <div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
+                <span>Danh sách câu hỏi trong đề</span>
+                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800 font-ui">
+                  {parsedData?.length || 0} câu
+                </span>
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Thêm câu hỏi từ Ngân hàng, thêm câu mới, sắp xếp hoặc xóa câu
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowBankPickerModal(true)}
+                className="btn-primary py-2 px-3.5 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus size={15} /> Thêm câu từ Ngân hàng
+              </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleAddNewManualQuestion('mcq')}
+                  className="btn-outline py-1.5 px-2.5 text-xs font-semibold"
+                  title="Thêm 1 câu Trắc nghiệm 4 phương án"
+                >
+                  + MCQ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddNewManualQuestion('tf')}
+                  className="btn-outline py-1.5 px-2.5 text-xs font-semibold"
+                  title="Thêm 1 câu Trắc nghiệm Đúng/Sai"
+                >
+                  + Đúng/Sai
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddNewManualQuestion('saq')}
+                  className="btn-outline py-1.5 px-2.5 text-xs font-semibold"
+                  title="Thêm 1 câu Trả lời ngắn"
+                >
+                  + TL Ngắn
+                </button>
+              </div>
+            </div>
+          </div>
+
           {parsedData && parsedData.length > 0 ? (
             <div className="space-y-6">
               {parsedData.map((q: any, i: number) => {
@@ -807,7 +999,7 @@ const ExamEditor = () => {
                 // --- TRẠNG THÁI EDITING (FORM SỬA TRỰC TIẾP) ---
                 if (editingIndex === i) {
                   return (
-                    <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-primary relative animate-in fade-in">
+                    <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-primary relative animate-in fade-in">
                       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#dee2e6]">
                         <Edit3 size={18} className="text-primary"/>
                         <span className="font-bold text-[14px] text-[#212529] uppercase tracking-wider">Đang sửa Câu {i + 1}</span>
@@ -991,28 +1183,59 @@ const ExamEditor = () => {
                 }
 
                 // --- TRẠNG THÁI HIỂN THỊ (VIEW MODE) ---
-                let typeLabel = "Trắc nghiệm 4 đáp án";
-                let badgeColor = "bg-[#cfe2ff] text-[#084298] border-[#9ec5fe]";
-                if (q.type === 'tf') { typeLabel = "Trắc nghiệm Đúng/Sai"; badgeColor = "bg-[#fff3cd] text-[#664d03] border-[#ffecb5]"; }
-                if (q.type === 'saq') { typeLabel = "Trả lời ngắn"; badgeColor = "bg-[#e2e3e5] text-[#41464b] border-[#d3d6d8]"; }
+                const qType = normalizeQuestionType(q);
+                const qLevel = normalizeQuestionLevel(q.level);
+                const typeInfo = QUESTION_FORMAT_LABELS[qType] || { short: 'MCQ', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' };
+                const levelInfo = COGNITIVE_LEVEL_LABELS[qLevel] || { label: 'Nhận biết', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
 
                 return (
-                  <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#dee2e6] hover:border-[#b6d4fe] transition-colors group relative">
+                  <div key={q.id || i} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 transition-colors group relative">
                     
-                    <button 
-                      onClick={() => { setEditingIndex(i); setEditForm(JSON.parse(JSON.stringify(q))); }} 
-                      className="absolute top-5 right-5 bg-white border border-[#dee2e6] text-[#6c757d] hover:bg-[#e7f1ff] hover:text-primary hover:border-[#b6d4fe] px-3 py-1.5 rounded text-[12px] font-bold opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Edit3 size={14}/> Sửa câu
-                    </button>
+                    {/* HÀNG NÚT THAO TÁC CỦA CÂU HỎI */}
+                    <div className="absolute top-5 right-5 flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-all">
+                      <button 
+                        type="button"
+                        onClick={() => handleMoveQuestion(i, 'up')}
+                        disabled={i === 0}
+                        title="Di chuyển câu lên trên"
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowUp size={14}/>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleMoveQuestion(i, 'down')}
+                        disabled={!parsedData || i === parsedData.length - 1}
+                        title="Di chuyển câu xuống dưới"
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowDown size={14}/>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => { setEditingIndex(i); setEditForm(JSON.parse(JSON.stringify(q))); }} 
+                        className="btn-outline px-2.5 py-1 text-xs font-bold flex items-center gap-1 shadow-2xs"
+                        title="Sửa nội dung câu hỏi"
+                      >
+                        <Edit3 size={13}/> Sửa
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteQuestion(i)} 
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-colors"
+                        title="Xóa câu hỏi khỏi đề"
+                      >
+                        <Trash2 size={14}/>
+                      </button>
+                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mb-5 pb-4 border-b border-[#e9ecef] pr-28">
+                    <div className="flex flex-wrap items-center gap-2 mb-5 pb-4 border-b border-slate-100 dark:border-slate-800 pr-40">
                       <span className="badge-primary">Câu {i + 1}</span>
-                      <span className="text-[11px] font-bold text-[#6c757d] uppercase bg-[#f8f9fa] border border-[#dee2e6] px-2 py-1 rounded">
-                        {q.level}
+                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${typeInfo.badgeClass}`}>
+                        {typeInfo.short}
                       </span>
-                      <span className={`text-[11px] font-bold uppercase px-2 py-1 rounded border ${badgeColor}`}>
-                        {typeLabel}
+                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${levelInfo.badgeClass}`}>
+                        {levelInfo.label}
                       </span>
                     </div>
 
@@ -1101,6 +1324,14 @@ const ExamEditor = () => {
         examTitle={title || 'Đề thi'}
         questions={parsedData || []}
         onApplyAnalysis={handleApplyAnalysis}
+      />
+
+      {/* MODAL CHỌN CÂU HỎI TỪ NGÂN HÀNG CÂU HỎI */}
+      <QuestionBankPickerModal
+        isOpen={showBankPickerModal}
+        onClose={() => setShowBankPickerModal(false)}
+        alreadySelectedIds={(parsedData || []).map(q => q.id).filter(Boolean)}
+        onAddQuestions={handleAddQuestionsFromBank}
       />
     </div>
   );

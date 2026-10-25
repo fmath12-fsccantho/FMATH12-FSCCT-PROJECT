@@ -17,6 +17,70 @@ import { CURRICULUM_FRAMEWORK, COGNITIVE_LEVELS } from '../../config/curriculumF
 import { canEditTheoryContent } from '../../utils/permissionUtils';
 import { Eye } from 'lucide-react';
 
+const AI_EXERCISE_PROMPT = `Bạn là một chuyên gia Toán học và kỹ sư dữ liệu giáo dục cho hệ thống FMATH12 PRO.
+Nhiệm vụ: Đọc toàn bộ danh sách bài tập/câu hỏi được cung cấp bên dưới, chuẩn hóa và chuyển đổi 100% thành mảng JSON để nạp vào Ngân hàng câu hỏi của Bài học.
+
+QUY TẮC BẮT BUỘC TUÂN THỦ:
+1. ĐÁP ÁN ĐÚNG & LỜI GIẢI CHI TIẾT:
+   - Giáo viên có thể đã đánh dấu đáp án đúng trong đề (in đậm, gạch chân, bôi đỏ, có dấu * ở phương án đúng, hoặc để bảng đáp án ở cuối). Bạn PHẢI trích xuất chính xác đáp án này làm \`correct_answer\`.
+   - Nếu đề chưa có đáp án, bạn hãy tự giải chính xác để xác định \`correct_answer\`.
+   - BẮT BUỘC viết \`explanation\` (lời giải chi tiết từng bước) sư phạm, logic, rõ ràng và dẫn đến đúng đáp án đó.
+
+2. CÔNG THỨC TOÁN & BẢNG BIỂU (LATEX):
+   - BẮT BUỘC dùng dấu $ cho công thức trong dòng: ví dụ $y = x^3 - 3x$, $\\frac{a}{b}$, $\\int_0^1 f(x)dx$.
+   - BẮT BUỘC dùng dấu $$ cho khối công thức riêng: ví dụ $$\\Delta = b^2 - 4ac$$.
+   - TUYỆT ĐỐI KHÔNG dùng \\( và \\).
+   - Trong chuỗi JSON, PHẢI escape dấu gạch chéo ngược: viết \\\\frac, \\\\sqrt, \\\\alpha, \\\\in.
+   - Bảng biến thiên / bảng xét dấu: Dùng cú pháp Markdown Table chuẩn (kèm \\n giữa các dòng, không viết dính trên 1 dòng).
+
+3. HÌNH ẢNH MINH HỌA: Nếu câu hỏi có hình minh họa/đồ thị, BẮT BUỘC chèn đúng cụm từ [CẦN CHÈN ẢNH] vào vị trí đó.
+
+4. CẤU TRÚC 3 DẠNG THỨC CHUẨN GDPT 2018:
+   - Dạng 1: Trắc nghiệm 4 lựa chọn (type: "mcq"):
+     {
+       "type": "mcq",
+       "level": "Nhận biết" (hoặc "Thông hiểu", "Vận dụng", "Vận dụng cao"),
+       "content": "Nội dung câu hỏi...",
+       "options": [
+         { "id": "A", "text": "Phương án A" },
+         { "id": "B", "text": "Phương án B" },
+         { "id": "C", "text": "Phương án C" },
+         { "id": "D", "text": "Phương án D" }
+       ],
+       "correct_answer": "A",
+       "explanation": "Lời giải chi tiết..."
+     }
+
+   - Dạng 2: Trắc nghiệm Đúng / Sai (type: "tf"):
+     {
+       "type": "tf",
+       "level": "Thông hiểu",
+       "content": "Nội dung câu hỏi...",
+       "options": [
+         { "id": "a", "text": "Ý mệnh đề a" },
+         { "id": "b", "text": "Ý mệnh đề b" },
+         { "id": "c", "text": "Ý mệnh đề c" },
+         { "id": "d", "text": "Ý mệnh đề d" }
+       ],
+       "correct_answer": { "a": true, "b": false, "c": true, "d": false },
+       "explanation": "Lời giải chi tiết từng ý a, b, c, d..."
+     }
+
+   - Dạng 3: Trắc nghiệm Trả lời ngắn (type: "saq"):
+     {
+       "type": "saq",
+       "level": "Vận dụng",
+       "content": "Nội dung câu hỏi...",
+       "options": [],
+       "correct_answer": "12.5",
+       "explanation": "Lời giải chi tiết..."
+     }
+
+TRẢ VỀ DUY NHẤT MẢNG JSON BẮT ĐẦU BẰNG [ VÀ KẾT THÚC BẰNG ]. KHÔNG VIẾT THÊM LỜI DẪN NGOÀI JSON.
+
+BÀI TẬP CẦN CHUYỂN ĐỔI:
+[DÁN BÀI TẬP CỦA THẦY/CÔ VÀO ĐÂY]`;
+
 const QuestionBank = () => {
   const { currentUser } = useAppStore();
   const canEditTheory = canEditTheoryContent(currentUser);
@@ -50,6 +114,13 @@ const QuestionBank = () => {
   const [jsonInput, setJsonInput] = useState("");
   const [jsonError, setJsonError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPromptCopied, setIsPromptCopied] = useState(false);
+
+  const handleCopyExercisePrompt = () => {
+    navigator.clipboard.writeText(AI_EXERCISE_PROMPT);
+    setIsPromptCopied(true);
+    setTimeout(() => setIsPromptCopied(false), 2000);
+  };
 
   // States cho AI Phân Tích Câu Hỏi (Chuẩn GDPT 2018)
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
@@ -420,13 +491,17 @@ const QuestionBank = () => {
   };
 
   const MarkdownComponents = {
-    img: ({ node, ...props }: any) => <img {...props} className="max-w-full h-auto rounded border border-[#dee2e6] my-4 block shadow-sm" alt={props.alt || "Ảnh"} loading="lazy" />,
-    table: ({ node, ...props }: any) => <div className="w-full overflow-x-auto my-6 rounded-lg border border-[#dee2e6] shadow-sm bg-white"><table className="w-full text-center border-collapse text-[14px]" {...props} /></div>,
-    thead: ({ node, ...props }: any) => <thead className="bg-[#f8f9fa] border-b-2 border-[#dee2e6] text-[#212529]" {...props} />,
-    tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#dee2e6]" {...props} />,
-    tr: ({ node, ...props }: any) => <tr className="transition-colors hover:bg-[#f8f9fa]/50" {...props} />,
-    th: ({ node, ...props }: any) => <th className="p-3 border-r border-[#dee2e6] last:border-r-0 font-bold whitespace-nowrap align-middle" {...props} />,
-    td: ({ node, ...props }: any) => <td className="p-3 border-r border-[#dee2e6] last:border-r-0 align-middle first:font-bold first:bg-[#f8f9fa] first:border-r-2" {...props} />,
+    img: ({ node, ...props }: any) => <img {...props} className="max-w-full h-auto rounded-xl border border-slate-200 dark:border-slate-700 my-4 block shadow-sm" alt={props.alt || "Ảnh"} loading="lazy" />,
+    table: ({ node, ...props }: any) => (
+      <div className="w-full overflow-x-auto my-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-900 dark:bg-slate-900">
+        <table className="w-full text-center border-collapse text-[14px] text-slate-800 dark:text-slate-100" {...props} />
+      </div>
+    ),
+    thead: ({ node, ...props }: any) => <thead className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100" {...props} />,
+    tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-slate-200 dark:divide-slate-700" {...props} />,
+    tr: ({ node, ...props }: any) => <tr className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/50" {...props} />,
+    th: ({ node, ...props }: any) => <th className="p-3 border-r border-slate-200 dark:border-slate-700 last:border-r-0 font-bold whitespace-nowrap align-middle text-slate-800 dark:text-slate-100" {...props} />,
+    td: ({ node, ...props }: any) => <td className="p-3 border-r border-slate-200 dark:border-slate-700 last:border-r-0 align-middle first:font-bold first:bg-slate-50 dark:first:bg-slate-800 first:border-r-2 text-slate-700 dark:text-slate-200" {...props} />,
   };
 
   // ==========================================
@@ -439,10 +514,10 @@ const QuestionBank = () => {
           
           <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-[#212529] mb-2 font-heading flex items-center gap-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2 font-heading flex items-center gap-2">
                 <LayoutList className="text-primary"/> Trung tâm Soạn giảng
               </h2>
-              <p className="text-[#6c757d] font-medium text-[14px]">Quản lý Lý thuyết và Ngân hàng câu hỏi chi tiết theo từng chương/bài.</p>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-[14px]">Quản lý Lý thuyết và Ngân hàng câu hỏi chi tiết theo từng chương/bài.</p>
             </div>
             <button onClick={handleCreateChapter} className="btn-primary py-2.5 px-6 rounded-lg text-[14px] flex items-center justify-center gap-2 shadow-sm">
               <PlusCircle size={18} /> Tạo Chương mới
@@ -454,8 +529,8 @@ const QuestionBank = () => {
             {/* ==========================================
                 CỘT TRÁI: DANH SÁCH CHƯƠNG & BÀI HỌC
                 ========================================== */}
-            <div className="w-full lg:w-[320px] shrink-0 bg-white rounded-xl border border-[#dee2e6] shadow-sm flex flex-col overflow-hidden">
-              <div className="p-4 border-b border-[#dee2e6] font-bold text-[#495057] uppercase tracking-wider text-[13px] flex items-center justify-between bg-[#f8f9fa]">
+            <div className="w-full lg:w-[320px] shrink-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[13px] flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
                 <span className="flex items-center gap-2"><BookOpen size={16}/> Lộ trình học</span>
                 <button onClick={handleCreateChapter} className="text-primary hover:underline text-[12px] font-bold flex items-center gap-1">
                   <Plus size={14}/> Chương
@@ -465,33 +540,33 @@ const QuestionBank = () => {
                 {isLoading ? (
                   <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary"/></div>
                 ) : chapters.length === 0 ? (
-                  <div className="text-center text-[#adb5bd] text-[13px] py-10 font-medium">Chưa có chương nào.</div>
+                  <div className="text-center text-slate-400 dark:text-slate-500 text-[13px] py-10 font-medium">Chưa có chương nào.</div>
                 ) : (
                   chapters.map(chapter => {
                     const isExpanded = activeChapterId === chapter.id;
                     return (
-                      <div key={chapter.id} className="mb-2 bg-white border border-[#dee2e6] rounded-lg overflow-hidden">
+                      <div key={chapter.id} className="mb-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                         <button 
                           onClick={() => setActiveChapterId(isExpanded ? null : chapter.id)}
-                          className="w-full flex items-center justify-between p-3 bg-[#f8f9fa] hover:bg-[#e9ecef] font-bold text-[#212529] text-[14px] transition-colors text-left"
+                          className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700/60 font-bold text-slate-900 dark:text-slate-100 text-[14px] transition-colors text-left"
                         >
                           <span className="truncate pr-2">{chapter.title}</span>
                           <div className="flex items-center gap-2 shrink-0">
-                            {isExpanded ? <ChevronDown size={16} className="text-[#adb5bd]"/> : <ChevronRight size={16} className="text-[#adb5bd]"/>}
+                            {isExpanded ? <ChevronDown size={16} className="text-slate-400 dark:text-slate-500"/> : <ChevronRight size={16} className="text-slate-400 dark:text-slate-500"/>}
                           </div>
                         </button>
                         
                         {isExpanded && (
-                          <div className="divide-y divide-[#e9ecef] bg-white">
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                             {chapter.lessons?.map((lesson: any) => {
                               const isActive = activeLesson?.id === lesson.id;
                               return (
                                 <button 
                                   key={lesson.id} 
                                   onClick={() => handleSelectLesson(lesson)}
-                                  className={`w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors ${isActive ? 'bg-[#e7f1ff] border-l-4 border-l-primary' : 'hover:bg-[#f8f9fa] border-l-4 border-l-transparent'}`}
+                                  className={`w-full text-left px-4 py-3 flex flex-col gap-1 transition-colors ${isActive ? 'bg-blue-50 dark:bg-blue-950/60 border-l-4 border-l-primary' : 'hover:bg-slate-50 dark:bg-slate-800/80 border-l-4 border-l-transparent'}`}
                                 >
-                                  <div className={`text-[13px] font-medium line-clamp-2 flex items-start gap-2 ${isActive ? 'text-primary font-bold' : 'text-[#495057]'}`}>
+                                  <div className={`text-[13px] font-medium line-clamp-2 flex items-start gap-2 ${isActive ? 'text-primary font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
                                     <FileText size={14} className="shrink-0 mt-0.5"/> {lesson.title}
                                   </div>
                                 </button>
@@ -500,7 +575,7 @@ const QuestionBank = () => {
                             {canEditTheory && (
                               <button
                                 onClick={() => handleCreateLesson(chapter.id)}
-                                className="w-full text-left px-4 py-2 text-[12px] font-bold text-primary hover:bg-[#e7f1ff] transition-colors flex items-center gap-1.5"
+                                className="w-full text-left px-4 py-2 text-[12px] font-bold text-primary hover:bg-blue-50 dark:bg-blue-950/60 transition-colors flex items-center gap-1.5"
                               >
                                 <Plus size={14} /> + Thêm Bài học mới
                               </button>
@@ -517,24 +592,24 @@ const QuestionBank = () => {
             {/* ==========================================
                 CỘT PHẢI: NỘI DUNG CHI TIẾT BÀI HỌC
                 ========================================== */}
-            <div className="flex-1 bg-white rounded-xl border border-[#dee2e6] shadow-sm flex flex-col overflow-hidden">
+            <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden">
               {activeLesson ? (
                 <>
-                  <div className="p-6 border-b border-[#dee2e6] bg-[#f8f9fa]">
-                    <div className="text-[11px] font-bold uppercase text-[#6c757d] tracking-wider mb-1.5">Đang soạn thảo bài học</div>
-                    <h3 className="text-[20px] font-bold font-heading text-[#212529] m-0 line-clamp-2">{activeLesson.title}</h3>
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80">
+                    <div className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">Đang soạn thảo bài học</div>
+                    <h3 className="text-[20px] font-bold font-heading text-slate-900 dark:text-slate-100 m-0 line-clamp-2">{activeLesson.title}</h3>
                   </div>
 
-                  <div className="flex px-2 pt-2 border-b border-[#dee2e6] gap-2 shrink-0 bg-[#f8f9fa] overflow-x-auto custom-scrollbar">
-                    <button onClick={() => setActiveTab('theory')} className={`px-4 py-2.5 font-bold text-[13px] uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap rounded-t-lg ${activeTab === 'theory' ? 'border-primary text-primary bg-white' : 'border-transparent text-[#6c757d] hover:bg-[#e9ecef]'}`}>
+                  <div className="flex px-2 pt-2 border-b border-slate-200 dark:border-slate-800 gap-2 shrink-0 bg-slate-50 dark:bg-slate-800/80 overflow-x-auto custom-scrollbar">
+                    <button onClick={() => setActiveTab('theory')} className={`px-4 py-2.5 font-bold text-[13px] uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap rounded-t-lg ${activeTab === 'theory' ? 'border-primary text-primary bg-white dark:bg-slate-900' : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60'}`}>
                       <BookOpen size={16}/> Lý thuyết
                     </button>
-                    <button onClick={() => setActiveTab('practice')} className={`px-4 py-2.5 font-bold text-[13px] uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap rounded-t-lg ${activeTab === 'practice' ? 'border-primary text-primary bg-white' : 'border-transparent text-[#6c757d] hover:bg-[#e9ecef]'}`}>
+                    <button onClick={() => setActiveTab('practice')} className={`px-4 py-2.5 font-bold text-[13px] uppercase tracking-wider flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap rounded-t-lg ${activeTab === 'practice' ? 'border-primary text-primary bg-white dark:bg-slate-900' : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60'}`}>
                       <Database size={16}/> Bài tập ({exercises.length})
                     </button>
                   </div>
 
-                  <div className={`flex-1 custom-scrollbar ${isFullScreen ? 'fixed inset-0 z-[100] bg-[#f8f9fa] p-4 flex flex-col' : 'overflow-y-auto p-4 md:p-6 relative bg-white'}`}>
+                  <div className={`flex-1 custom-scrollbar ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-800/80 p-4 flex flex-col' : 'overflow-y-auto p-4 md:p-6 relative bg-white dark:bg-slate-900'}`}>
                     
                     {/* ========================================== */}
                     {/* TAB: LÝ THUYẾT                             */}
@@ -543,11 +618,11 @@ const QuestionBank = () => {
                       <div className="animate-in fade-in h-full flex flex-col min-h-[400px]">
                         
                         <div className="flex flex-wrap justify-between items-center mb-4 shrink-0 gap-4">
-                          <div className="flex items-center gap-2 text-[#495057]">
+                          <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                             <BookOpen size={18}/>
                             <h4 className="font-bold text-[15px] m-0">Bài giảng lý thuyết</h4>
                             {isEditingTheory && theoryInput.includes('[CẦN CHÈN ẢNH]') && (
-                              <span className="px-2 py-0.5 bg-[#fff3cd] text-[#664d03] rounded text-[11px] font-bold animate-pulse flex items-center gap-1 border border-[#ffecb5] ml-2">
+                              <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 rounded text-[11px] font-bold animate-pulse flex items-center gap-1 border border-amber-200 dark:border-amber-800 ml-2">
                                 <AlertTriangle size={12}/> Vị trí trống ảnh
                               </span>
                             )}
@@ -590,26 +665,26 @@ const QuestionBank = () => {
 
                         {isEditingTheory ? (
                           <div className={`flex-1 flex gap-4 ${isFullScreen ? 'flex-row' : 'flex-col'}`}>
-                            <div className="flex-1 border border-[#dee2e6] rounded-xl overflow-hidden flex flex-col bg-white">
-                              <div className="bg-[#f8f9fa] border-b border-[#dee2e6] px-3 py-1.5 text-[11px] font-bold text-[#6c757d] uppercase tracking-wider">
+                            <div className="flex-1 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-slate-900">
+                              <div className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 px-3 py-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 Trình soạn thảo (Markdown + LaTeX)
                               </div>
                               <textarea
                                 value={theoryInput}
                                 onChange={e => setTheoryInput(e.target.value)}
                                 placeholder="Soạn bài giảng Markdown tại đây...&#10;Dùng $...$ cho công thức nội tuyến, $$...$$ cho khối công thức."
-                                className="flex-1 w-full p-4 font-mono text-[14px] leading-relaxed outline-none resize-none custom-scrollbar text-[#212529] bg-white"
+                                className="flex-1 w-full p-4 font-mono text-[14px] leading-relaxed outline-none resize-none custom-scrollbar text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
                                 spellCheck="false"
                               />
                             </div>
                             
                             {isFullScreen && (
-                              <div className="flex-1 bg-white border border-[#dee2e6] rounded-xl overflow-hidden flex flex-col">
-                                <div className="bg-[#f8f9fa] border-b border-[#dee2e6] px-3 py-1.5 text-[11px] font-bold text-[#6c757d] uppercase tracking-wider">
+                              <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col">
+                                <div className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 px-3 py-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                   Xem trước giao diện
                                 </div>
                                 <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                                  <div className="prose prose-sm max-w-none text-[#212529] leading-[1.8] [&_.katex-display]:my-4">
+                                  <div className="prose prose-sm max-w-none text-slate-900 dark:text-slate-100 leading-[1.8] [&_.katex-display]:my-4">
                                     <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
                                       {theoryInput || '*Chưa có nội dung...*'}
                                     </ReactMarkdown>
@@ -619,15 +694,15 @@ const QuestionBank = () => {
                             )}
                           </div>
                         ) : (
-                          <div className="flex-1 bg-white p-6 rounded-xl border border-[#dee2e6] overflow-y-auto custom-scrollbar shadow-sm">
+                          <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 overflow-y-auto custom-scrollbar shadow-sm">
                             {activeLesson.theory_content ? (
-                              <div className="prose prose-sm max-w-none text-[#212529] leading-[1.8] [&_.katex-display]:my-4">
+                              <div className="prose prose-sm max-w-none text-slate-900 dark:text-slate-100 leading-[1.8] [&_.katex-display]:my-4">
                                 <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>
                                   {activeLesson.theory_content}
                                 </ReactMarkdown>
                               </div>
                             ) : (
-                              <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-[#adb5bd]">
+                              <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-slate-400 dark:text-slate-500">
                                 <BookOpen size={48} className="mb-3 opacity-30" />
                                 <p className="font-bold text-[14px]">Chưa có nội dung lý thuyết.</p>
                                 <p className="text-[12px] mt-1">Bấm "Sửa bài giảng" để bắt đầu soạn giáo án.</p>
@@ -646,17 +721,29 @@ const QuestionBank = () => {
                         <input type="file" accept="image/*" ref={questionFileInputRef} className="hidden" onChange={handleQuestionImageUpload} />
 
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                          <h4 className="font-bold text-[#212529] text-[15px] m-0 flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-[15px] m-0 flex items-center gap-2">
                             <Database size={18} className="text-primary"/> Ngân hàng câu hỏi
                           </h4>
                           <div className="flex flex-wrap gap-2">
                             <button onClick={handleOpenCustomAnalysis} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-[13px] flex items-center gap-2 transition-all shadow-xs">
                               <Sparkles size={16}/> AI Giám định câu hỏi
                             </button>
-                            <button onClick={() => setShowJsonModal(true)} className="bg-[#e7f1ff] hover:bg-[#cfe2ff] text-primary px-4 py-2 rounded-lg font-bold text-[13px] flex items-center gap-2 transition-colors border border-[#b6d4fe]">
+                            <button 
+                              onClick={handleCopyExercisePrompt} 
+                              className={`px-3.5 py-2 rounded-lg font-bold text-[13px] flex items-center gap-1.5 transition-colors border shadow-2xs ${
+                                isPromptCopied 
+                                  ? 'bg-emerald-600 text-white border-emerald-600' 
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                              title="Sao chép Prompt AI chuẩn hóa bài tập để gửi cho ChatGPT / Claude / Gemini"
+                            >
+                              {isPromptCopied ? <Check size={16}/> : <Copy size={16}/>}
+                              <span>{isPromptCopied ? 'Đã Copy Prompt' : 'Copy Prompt AI'}</span>
+                            </button>
+                            <button onClick={() => setShowJsonModal(true)} className="bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-primary px-4 py-2 rounded-lg font-bold text-[13px] flex items-center gap-2 transition-colors border border-blue-200 dark:border-blue-800">
                               <FileJson size={16}/> Nhập từ AI (JSON)
                             </button>
-                            <button className="bg-white border border-[#dee2e6] hover:bg-[#f8f9fa] text-[#495057] px-4 py-2 rounded-lg font-bold text-[13px] flex items-center gap-2 transition-colors">
+                            <button className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-bold text-[13px] flex items-center gap-2 transition-colors">
                               <Plus size={16}/> Tạo thủ công
                             </button>
                           </div>
@@ -665,7 +752,7 @@ const QuestionBank = () => {
                         {isFetchingEx ? (
                           <div className="flex justify-center py-10"><Loader2 className="animate-spin text-primary" size={32}/></div>
                         ) : exercises.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-16 text-[#adb5bd] border border-dashed border-[#dee2e6] rounded-xl bg-[#f8f9fa]">
+                          <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-800/80">
                             <Database size={48} className="mb-4 opacity-20" />
                             <p className="font-medium text-sm">Bài học này chưa có câu hỏi nào.</p>
                             <p className="text-xs mt-2">Hãy copy JSON sinh ra từ AI và bấm "Nhập từ AI" nhé.</p>
@@ -674,22 +761,22 @@ const QuestionBank = () => {
                           <div className="space-y-4">
                             {exercises.map((q, idx) => {
                               let typeLabel = "Trắc nghiệm 4 đáp án";
-                              let badgeColor = "bg-[#cfe2ff] text-[#084298] border-[#9ec5fe]";
-                              if (q.type === 'tf') { typeLabel = "Trắc nghiệm Đúng/Sai"; badgeColor = "bg-[#fff3cd] text-[#664d03] border-[#ffecb5]"; }
+                              let badgeColor = "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+                              if (q.type === 'tf') { typeLabel = "Trắc nghiệm Đúng/Sai"; badgeColor = "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800"; }
                               if (q.type === 'saq') { typeLabel = "Trả lời ngắn"; badgeColor = "bg-[#e2e3e5] text-[#41464b] border-[#d3d6d8]"; }
 
                               return (
-                                <div key={q.id} className="bg-white p-5 rounded-xl border border-[#dee2e6] shadow-sm relative group hover:border-[#b6d4fe] transition-colors">
+                                <div key={q.id} className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative group hover:border-blue-200 dark:border-blue-800 transition-colors">
                                   
                                   <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleDeleteQuestion(q.id)} className="p-1.5 bg-white border border-[#dee2e6] text-[#6c757d] hover:text-[#dc3545] hover:bg-[#f8d7da] hover:border-[#f5c2c7] rounded transition-colors" title="Xóa câu hỏi">
+                                    <button onClick={() => handleDeleteQuestion(q.id)} className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-[#dc3545] hover:bg-[#f8d7da] hover:border-[#f5c2c7] rounded transition-colors" title="Xóa câu hỏi">
                                       <Trash2 size={14}/>
                                     </button>
                                   </div>
 
                                   <div className="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-[#e9ecef] pr-12">
                                     <span className="badge-primary">Câu {idx + 1}</span>
-                                    <span className="text-[10px] font-bold text-[#6c757d] uppercase bg-[#f8f9fa] border border-[#dee2e6] px-2 py-0.5 rounded">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded">
                                       {q.level}
                                     </span>
                                     <button 
@@ -705,7 +792,7 @@ const QuestionBank = () => {
                                   </div>
                                   
                                   {/* HIỂN THỊ VÀ CHÈN ẢNH VÀO NỘI DUNG */}
-                                  <div className="prose prose-sm max-w-none text-[#212529] mb-4 leading-[1.8] [&_.katex-display]:my-2 overflow-x-auto">
+                                  <div className="prose prose-sm max-w-none text-slate-900 dark:text-slate-100 mb-4 leading-[1.8] [&_.katex-display]:my-2 overflow-x-auto">
                                     <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{q.content}</ReactMarkdown>
                                   </div>
 
@@ -713,7 +800,7 @@ const QuestionBank = () => {
                                     <button 
                                       onClick={() => { setUploadTarget({ id: q.id, field: 'content' }); questionFileInputRef.current?.click(); }}
                                       disabled={isUploadingQuestionImg}
-                                      className="mb-4 bg-[#f8f9fa] text-[#495057] border border-[#dee2e6] border-dashed hover:border-primary hover:text-primary px-3 py-1.5 rounded text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+                                      className="mb-4 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 border-dashed hover:border-primary hover:text-primary px-3 py-1.5 rounded text-[11px] font-bold flex items-center gap-1.5 transition-colors"
                                     >
                                       {isUploadingQuestionImg && uploadTarget?.id === q.id && uploadTarget.field === 'content' ? <Loader2 size={12} className="animate-spin text-primary"/> : <ImageIcon size={12}/>}
                                       Click tải ảnh thay thế [CẦN CHÈN ẢNH]
@@ -724,16 +811,16 @@ const QuestionBank = () => {
                                   {q.type === 'mcq' && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                       {Array.isArray(q.options) && q.options.map((opt: any) => (
-                                        <div key={opt.id} className={`p-3 rounded-lg border text-[14px] flex items-start gap-2.5 ${opt.id === q.correct_answer ? 'bg-[#d1e7dd] border-[#198754]' : 'bg-[#f8f9fa] border-[#dee2e6]'}`}>
-                                          <strong className={`shrink-0 font-ui text-[13px] ${opt.id === q.correct_answer ? 'text-[#0f5132]' : 'text-[#6c757d]'}`}>{opt.id}.</strong> 
-                                          <div className={`prose prose-sm max-w-none flex-1 overflow-x-auto leading-relaxed m-0 ${opt.id === q.correct_answer ? 'text-[#0f5132]' : 'text-[#212529]'}`}>
+                                        <div key={opt.id} className={`p-3 rounded-lg border text-[14px] flex items-start gap-2.5 ${opt.id === q.correct_answer ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-600' : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-800'}`}>
+                                          <strong className={`shrink-0 font-ui text-[13px] ${opt.id === q.correct_answer ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>{opt.id}.</strong> 
+                                          <div className={`prose prose-sm max-w-none flex-1 overflow-x-auto leading-relaxed m-0 ${opt.id === q.correct_answer ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-100'}`}>
                                             <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown>
                                           </div>
                                           {opt.text?.includes('[CẦN CHÈN ẢNH]') && (
                                             <button 
                                               onClick={() => { setUploadTarget({ id: q.id, field: 'option', optId: opt.id }); questionFileInputRef.current?.click(); }}
                                               disabled={isUploadingQuestionImg}
-                                              className="bg-white border border-[#dee2e6] text-[#6c757d] px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-[#e9ecef] transition-colors shrink-0"
+                                              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors shrink-0"
                                             >
                                               <ImageIcon size={12}/> Chèn ảnh
                                             </button>
@@ -753,19 +840,19 @@ const QuestionBank = () => {
                                         const isTrue = tfAns[optId] === true;
                                         
                                         return (
-                                          <div key={opt.id} className={`p-3 rounded-lg border text-[14px] flex items-start gap-2.5 ${isTrue ? 'bg-[#d1e7dd] border-[#198754]' : 'bg-[#f8f9fa] border-[#dee2e6]'}`}>
-                                            <strong className={`shrink-0 font-ui text-[13px] ${isTrue ? 'text-[#0f5132]' : 'text-[#6c757d]'}`}>{optId})</strong> 
-                                            <div className={`prose prose-sm max-w-none flex-1 overflow-x-auto leading-relaxed m-0 ${isTrue ? 'text-[#0f5132]' : 'text-[#212529]'}`}>
+                                          <div key={opt.id} className={`p-3 rounded-lg border text-[14px] flex items-start gap-2.5 ${isTrue ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-600' : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-800'}`}>
+                                            <strong className={`shrink-0 font-ui text-[13px] ${isTrue ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>{optId})</strong> 
+                                            <div className={`prose prose-sm max-w-none flex-1 overflow-x-auto leading-relaxed m-0 ${isTrue ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-slate-100'}`}>
                                               <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{opt.text}</ReactMarkdown>
                                             </div>
-                                            <div className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${isTrue ? 'bg-white text-[#198754] border-[#a3cfbb]' : 'bg-white text-[#6c757d] border-[#dee2e6]'}`}>
+                                            <div className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${isTrue ? 'bg-white dark:bg-slate-900 text-[#198754] border-[#a3cfbb]' : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'}`}>
                                               {isTrue ? 'ĐÚNG' : 'SAI'}
                                             </div>
                                             {opt.text?.includes('[CẦN CHÈN ẢNH]') && (
                                               <button 
                                                 onClick={() => { setUploadTarget({ id: q.id, field: 'option', optId: opt.id }); questionFileInputRef.current?.click(); }}
                                                 disabled={isUploadingQuestionImg}
-                                                className="bg-white border border-[#dee2e6] text-[#6c757d] px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-[#e9ecef] transition-colors shrink-0"
+                                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors shrink-0"
                                               >
                                                 <ImageIcon size={12}/> Chèn ảnh
                                               </button>
@@ -778,24 +865,24 @@ const QuestionBank = () => {
 
                                   {/* HIỂN THỊ SAQ */}
                                   {q.type === 'saq' && (
-                                    <div className="mb-4 flex items-center gap-3 bg-white p-3 rounded-lg border border-[#dee2e6]">
-                                      <span className="text-[12px] font-bold text-[#6c757d] uppercase tracking-wider">Đáp án điền khuyết: </span>
+                                    <div className="mb-4 flex items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+                                      <span className="text-[12px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Đáp án điền khuyết: </span>
                                       <span className="font-bold text-[16px] text-[#198754]">{q.correct_answer}</span>
                                     </div>
                                   )}
 
                                   {/* LỜI GIẢI VÀ CHÈN ẢNH VÀO LỜI GIẢI */}
                                   {q.explanation && (
-                                    <div className="bg-[#fff3cd] p-4 rounded-lg border border-[#ffecb5]">
-                                      <span className="text-[11px] font-bold text-[#997404] uppercase tracking-wider mb-2 flex items-center gap-1.5"><BrainCircuit size={14}/> Lời giải hệ thống</span>
-                                      <div className="prose prose-sm max-w-none text-[#664d03] leading-[1.8] [&_.katex-display]:my-2">
+                                    <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5"><BrainCircuit size={14}/> Lời giải hệ thống</span>
+                                      <div className="prose prose-sm max-w-none text-amber-800 dark:text-amber-200 leading-[1.8] [&_.katex-display]:my-2">
                                         <ReactMarkdown remarkPlugins={[remarkMath, remarkGfm]} rehypePlugins={[rehypeKatex]} components={MarkdownComponents}>{q.explanation}</ReactMarkdown>
                                       </div>
                                       {q.explanation.includes('[CẦN CHÈN ẢNH]') && (
                                         <button 
                                           onClick={() => { setUploadTarget({ id: q.id, field: 'explanation' }); questionFileInputRef.current?.click(); }}
                                           disabled={isUploadingQuestionImg}
-                                          className="mt-3 bg-white border border-[#ffecb5] text-[#997404] hover:bg-[#fff3cd] px-3 py-1.5 rounded text-[11px] font-bold flex items-center gap-1.5 transition-colors animate-pulse w-fit"
+                                          className="mt-3 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded text-[11px] font-bold flex items-center gap-1.5 transition-colors animate-pulse w-fit"
                                         >
                                           {isUploadingQuestionImg && uploadTarget?.id === q.id && uploadTarget.field === 'explanation' ? <Loader2 size={12} className="animate-spin"/> : <ImageIcon size={12}/>}
                                           Click tải ảnh thay thế [CẦN CHÈN ẢNH]
@@ -813,9 +900,9 @@ const QuestionBank = () => {
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-[#adb5bd] p-10 bg-white">
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-10 bg-white dark:bg-slate-900">
                   <BookOpen size={64} className="mb-4 opacity-30"/>
-                  <p className="font-bold text-[16px] text-[#495057] mb-2 font-heading">Chưa chọn bài học</p>
+                  <p className="font-bold text-[16px] text-slate-700 dark:text-slate-300 mb-2 font-heading">Chưa chọn bài học</p>
                   <p className="text-[13px] text-center">Bấm vào một bài học ở danh sách bên trái để bắt đầu soạn giảng.</p>
                 </div>
               )}
@@ -829,45 +916,120 @@ const QuestionBank = () => {
       {/* MODAL NHẬP JSON TỪ AI                      */}
       {/* ========================================== */}
       {showJsonModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-bs-hover border border-[#dee2e6] relative flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 lg:p-6 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 relative flex flex-col max-h-[92vh] overflow-hidden">
             
-            <div className="px-6 py-4 border-b border-[#dee2e6] flex justify-between items-center bg-[#f8f9fa] shrink-0 rounded-t-xl">
-              <div>
-                <h3 className="text-[20px] font-bold font-heading text-[#212529] m-0 flex items-center gap-2">
-                  <FileJson className="text-primary"/> Nhập JSON (AI)
-                </h3>
-                <p className="text-[12px] font-bold text-[#198754] m-0 mt-1 uppercase tracking-wider">
-                  Gắn vào: {activeLesson?.title}
-                </p>
-              </div>
-              <button onClick={() => setShowJsonModal(false)} className="p-1.5 bg-white border border-[#dee2e6] hover:bg-[#e9ecef] rounded-lg text-[#6c757d] transition-colors"><X size={18}/></button>
-            </div>
-            
-            <div className="p-6 flex-1 flex flex-col min-h-0">
-              {jsonError && (
-                <div className="mb-4 p-3 bg-[#f8d7da] border border-[#f5c2c7] text-[#dc3545] rounded-lg text-[13px] font-bold flex items-start gap-2 shadow-sm">
-                  <AlertTriangle size={16} className="shrink-0 mt-0.5"/> <span>{jsonError}</span>
+            {/* MODAL HEADER */}
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-850 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  <FileJson size={22} />
                 </div>
-              )}
-
-              <div className="flex-1 min-h-[300px] flex flex-col">
-                 <textarea 
-                  value={jsonInput}
-                  onChange={e => setJsonInput(e.target.value)}
-                  placeholder="Dán mã JSON của AI vào đây...&#10;Hệ thống sẽ tự động bóc tách và sửa lỗi định dạng Markdown nếu có."
-                  className="flex-1 w-full bg-[#212529] text-[#a3cfbb] font-mono text-[13px] p-5 rounded-lg border border-[#495057] outline-none focus:border-[#6ea8fe] resize-none custom-scrollbar shadow-inner"
-                  spellCheck="false"
-                />
+                <div>
+                  <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white m-0">
+                    Công cụ nạp bài tập từ AI (Chuẩn hóa tự động)
+                  </h3>
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 m-0 mt-0.5 flex items-center gap-1.5">
+                    <CheckCircle2 size={13} /> Đang nạp vào: <b>{activeLesson?.title}</b>
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-[#dee2e6] bg-[#f8f9fa] flex justify-end gap-3 shrink-0 rounded-b-xl">
-              <button onClick={() => setShowJsonModal(false)} className="px-5 py-2.5 bg-white border border-[#dee2e6] hover:bg-[#e9ecef] text-[#495057] font-bold rounded-lg transition-colors text-[13px]">Hủy</button>
-              <button onClick={handleParseAndSaveJSON} disabled={isSaving} className="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 text-[13px]">
-                {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} LƯU DỮ LIỆU JSON
+              <button 
+                onClick={() => setShowJsonModal(false)} 
+                className="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 transition-colors"
+              >
+                <X size={18}/>
               </button>
             </div>
+            
+            {/* MODAL BODY (2 CỘT: PROMPT & DÁN JSON) */}
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+              
+              {/* CỘT TRÁI: BƯỚC 1 - PROMPT CHUYỂN BÀI TẬP */}
+              <div className="w-full lg:w-1/2 p-6 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400 font-heading block">
+                      Bước 1: Prompt AI Chuyển bài tập
+                    </label>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Gửi kèm bài tập của Thầy/Cô cho ChatGPT / Gemini / Claude
+                    </span>
+                  </div>
+                  <button 
+                    onClick={handleCopyExercisePrompt} 
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shrink-0 shadow-2xs ${
+                      isPromptCopied 
+                        ? 'bg-emerald-600 text-white border-emerald-600' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {isPromptCopied ? <><Check size={14}/> Đã Copy Prompt</> : <><Copy size={14}/> Sao chép Prompt</>}
+                  </button>
+                </div>
+
+                <div className="mb-3 p-3 bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/50 rounded-xl text-xs text-purple-800 dark:text-purple-300 leading-relaxed font-sans">
+                  💡 <b>Cách làm:</b> Bấm <b>"Sao chép Prompt"</b> bên trên $\rightarrow$ Dán vào AI $\rightarrow$ Dán danh sách câu hỏi/bài tập ở cuối $\rightarrow$ AI sẽ trả về mảng JSON chuẩn.
+                </div>
+                
+                <div className="flex-1 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700 font-mono text-xs leading-[1.6] text-slate-700 dark:text-slate-300 select-all overflow-y-auto custom-scrollbar min-h-[220px]">
+                  {AI_EXERCISE_PROMPT.split('\n').map((line, i) => <div key={i}>{line || <br/>}</div>)}
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: BƯỚC 2 - DÁN KẾT QUẢ JSON */}
+              <div className="w-full lg:w-1/2 p-6 flex flex-col bg-slate-950">
+                <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-800">
+                  <label className="text-xs font-extrabold uppercase tracking-wider text-blue-400 font-heading">
+                    Bước 2: Dán mã JSON kết quả từ AI
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    Hỗ trợ tự động lọc sạch thẻ markdown
+                  </span>
+                </div>
+
+                {jsonError && (
+                  <div className="mb-3 p-3 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-xl text-xs font-bold flex items-start gap-2 shadow-sm animate-in fade-in">
+                    <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-400"/>
+                    <span>{jsonError}</span>
+                  </div>
+                )}
+
+                <div className="flex-1 min-h-[260px] flex flex-col">
+                  <textarea 
+                    value={jsonInput}
+                    onChange={e => setJsonInput(e.target.value)}
+                    placeholder="Dán mã JSON mảng [...] từ AI vào đây...&#10;Hệ thống sẽ tự động bóc tách và phân loại dạng thức, công thức toán LaTeX."
+                    className="flex-1 w-full bg-slate-900 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-slate-800 outline-none focus:border-blue-500 resize-none custom-scrollbar shadow-inner"
+                    spellCheck="false"
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Hỗ trợ đầy đủ: Trắc nghiệm 4 lựa chọn, Đúng / Sai, Trả lời ngắn & công thức LaTeX
+              </span>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowJsonModal(false)} 
+                  className="btn-outline px-5 py-2 text-xs font-bold"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={handleParseAndSaveJSON} 
+                  disabled={isSaving || !jsonInput.trim()} 
+                  className="btn-primary px-6 py-2 text-xs font-bold flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                >
+                  {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} LƯU BÀI TẬP VÀO BÀI HỌC
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -877,16 +1039,16 @@ const QuestionBank = () => {
       {/* ========================================== */}
       {showAnalysisModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-[#dee2e6] relative flex flex-col max-h-[92vh] overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 relative flex flex-col max-h-[92vh] overflow-hidden">
             
             {/* Header Modal */}
-            <div className="px-6 py-4 border-b border-[#dee2e6] flex justify-between items-center bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/80 shrink-0">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/80 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
                   <Sparkles size={20} />
                 </div>
                 <div>
-                  <h3 className="text-[17px] font-bold font-heading text-[#212529] m-0 flex items-center gap-2">
+                  <h3 className="text-[17px] font-bold font-heading text-slate-900 dark:text-slate-100 m-0 flex items-center gap-2">
                     AI Giám Định & Định Vị Khung Kiến Thức
                   </h3>
                   <p className="text-[11px] font-medium text-slate-500 m-0 mt-0.5">
@@ -896,18 +1058,18 @@ const QuestionBank = () => {
               </div>
               <button 
                 onClick={() => setShowAnalysisModal(false)} 
-                className="p-1.5 bg-white border border-[#dee2e6] hover:bg-[#e9ecef] rounded-lg text-[#6c757d] transition-colors"
+                className="p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-lg text-slate-500 dark:text-slate-400 transition-colors"
               >
                 <X size={18}/>
               </button>
             </div>
             
             {/* Body Modal */}
-            <div className="p-6 flex-1 overflow-y-auto space-y-5 custom-scrollbar text-[#212529]">
+            <div className="p-6 flex-1 overflow-y-auto space-y-5 custom-scrollbar text-slate-900 dark:text-slate-100">
               
               {/* Chế độ nhập câu hỏi tự do */}
               {isCustomAnalysis && (
-                <div className="bg-[#f8f9fa] border border-[#e9ecef] rounded-xl p-4">
+                <div className="bg-slate-50 dark:bg-slate-800/80 border border-[#e9ecef] rounded-xl p-4">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                     Nhập hoặc dán nội dung câu hỏi (hỗ trợ công thức LaTeX $...$):
                   </label>
@@ -916,7 +1078,7 @@ const QuestionBank = () => {
                     onChange={e => setCustomQuestionText(e.target.value)}
                     placeholder="Ví dụ: Cho hàm số y = f(x) có đạo hàm f'(x) = x(x-1)^2(x+2). Số điểm cực trị của hàm số đã cho là:&#10;A. 1   B. 2   C. 3   D. 4"
                     rows={4}
-                    className="w-full bg-white text-slate-800 text-[13px] p-3 rounded-lg border border-slate-300 outline-none focus:border-blue-500 transition-colors shadow-inner font-sans resize-y"
+                    className="w-full bg-white dark:bg-slate-900 text-slate-800 text-[13px] p-3 rounded-lg border border-slate-300 outline-none focus:border-blue-500 transition-colors shadow-inner font-sans resize-y"
                   />
                   <div className="mt-3 flex justify-end">
                     <button 
@@ -936,7 +1098,7 @@ const QuestionBank = () => {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Câu hỏi đang kiểm tra</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-300 text-slate-700">
                       Mức hiện tại: {analyzingQuestion.level || "Chưa gán"}
                     </span>
                   </div>
@@ -980,7 +1142,7 @@ const QuestionBank = () => {
                           {analysisResult.level}
                         </span>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-500 bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-xs">
+                      <span className="text-[11px] font-bold text-slate-500 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-md border border-slate-200 shadow-xs">
                         Độ tin cậy: {analysisResult.confidence}%
                       </span>
                     </div>
@@ -989,7 +1151,7 @@ const QuestionBank = () => {
                       <p className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                         <Zap size={13} className="text-blue-600"/> Căn cứ phân loại:
                       </p>
-                      <p className="text-xs text-slate-600 leading-relaxed bg-white/80 p-3 rounded-lg border border-blue-100/60">
+                      <p className="text-xs text-slate-600 leading-relaxed bg-white dark:bg-slate-900/80 p-3 rounded-lg border border-blue-100/60">
                         {analysisResult.levelExplanation}
                       </p>
                     </div>
@@ -1011,7 +1173,7 @@ const QuestionBank = () => {
                   </div>
 
                   {/* Card Vị trí trong Khung Kiến Thức Chuẩn GDPT 2018 */}
-                  <div className="border border-slate-200 rounded-xl p-5 bg-white shadow-xs">
+                  <div className="border border-slate-200 rounded-xl p-5 bg-white dark:bg-slate-900 shadow-xs">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
                       <Layers size={14} className="text-indigo-600"/>
                       Vị trí trong Khung Chương Trình GDPT 2018
@@ -1071,14 +1233,14 @@ const QuestionBank = () => {
             </div>
 
             {/* Footer Modal */}
-            <div className="px-6 py-4 border-t border-[#dee2e6] bg-[#f8f9fa] flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between shrink-0">
               <span className="text-[11px] text-slate-500">
                 FMATH12 AI Academic Engine &bull; GDPT 2018
               </span>
               <div className="flex gap-2">
                 <button 
                   onClick={() => setShowAnalysisModal(false)}
-                  className="px-5 py-2 bg-white border border-[#dee2e6] hover:bg-[#e9ecef] text-[#495057] font-bold rounded-lg transition-colors text-xs"
+                  className="px-5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-300 font-bold rounded-lg transition-colors text-xs"
                 >
                   Đóng
                 </button>
