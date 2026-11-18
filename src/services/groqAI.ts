@@ -7,11 +7,11 @@ export const MODEL_NAME = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120
 
 // Bể chứa 5 API Keys được phân bổ để luân phiên và tự động cứu nguy khi chạm Rate Limit (429)
 export const GROQ_API_KEYS_POOL: string[] = [
-  import.meta.env.VITE_GROQ_API_KEY_1 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_2 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_3 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_4 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_5 || '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'
+  import.meta.env.VITE_GROQ_API_KEY_1,
+  import.meta.env.VITE_GROQ_API_KEY_2,
+  import.meta.env.VITE_GROQ_API_KEY_3,
+  import.meta.env.VITE_GROQ_API_KEY_4,
+  import.meta.env.VITE_GROQ_API_KEY_5
 ].filter(Boolean);
 
 let activeKeyIndex = 0;
