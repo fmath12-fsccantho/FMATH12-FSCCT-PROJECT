@@ -1,0 +1,33 @@
+<USER_REQUEST>
+Tách ra là khảo sát thực trạng và khảo sát thực nghiệm
+Thêm link (lấy link trực tiếp)
+1. Bộ Giáo dục và Đào tạo. (2018). Thông tư số 32/2018/TT-BGDĐT ngày 26/12/2018 ban hành Chương trình giáo dục phổ thông.
+Link Cổng thông tin điện tử Chính phủ / Thư viện Pháp luật:[https://thuvienphapluat.vn/van-ban/Giao-duc/Thong-tu-32-2018-TT-BGDDT-chuong-trinh-giao-duc-pho-thong-403953.aspx](https://www.google.com/search?q=https://thuvienphapluat.vn/van-ban/Giao-duc/Thong-tu-32-2018-TT-BGDDT-chuong-trinh-giao-duc-pho-thong-403953.aspx) (Hoặc trên Cổng thông tin của Bộ GD&ĐT: https://moet.gov.vn/)
+2. Brusilovsky, P., & Millán, E. (2007). User models for adaptive hypermedia and adaptive educational systems.
+DOI: [https://doi.org/10.1007/978-3-540-72079-9_1](https://www.google.com/search?q=https://doi.org/10.1007/978-3-540-72079-9_1)
+Link trực tiếp (Springer): https://link.springer.com/chapter/10.1007/978-3-540-72079-9_1
+3. Cronbach, L. J. (1951). Coefficient alpha and the internal structure of tests. Psychometrika, 16(3), 297–334.
+DOI: https://doi.org/10.1007/BF02310555
+Link trực tiếp (Springer): https://link.springer.com/article/10.1007/BF02310555
+4. Field, A. (2018). Discovering statistics using IBM SPSS Statistics (5th ed.). SAGE.
+Link Nhà xuất bản SAGE: [https://us.sagepub.com/en-us/nam/discovering-statistics-using-ibm-spss-statistics/book258102](https://www.google.com/search?q=https://us.sagepub.com/en-us/nam/discovering-statistics-using-ibm-spss-statistics/book258102) (Đây là sách in, có thể mua hoặc tìm đọc trên các thư viện học thuật).
+5. Knowles, M. S. (1975). Self-directed learning: A guide for learners and teachers. Association Press.
+Lưu ý: Đây là một cuốn sách kinh điển xuất bản năm 1975, hiện không có sẵn một link gốc miễn phí chính thức nào. Bạn có thể tra cứu sách trên Google Books hoặc Archive.org:
+Google Books: [https://books.google.com/books/about/Self_directed_Learning.html?id=lqO0AAAAIAAJ](https://www.google.com/search?q=https://books.google.com/books/about/Self_directed_Learning.html%3Fid%3DlqO0AAAAIAAJ)
+6. Likert, R. (1932). A technique for the measurement of attitudes. Archives of Psychology, 22(140), 1–55.
+Link đọc / Tải tài liệu lưu trữ: https://legacy.voteview.com/pdf/Likert_1932.pdf (Bản scan PDF được lưu trữ nhiều trên các thư viện trường Đại học do bài báo đã cũ).
+7. Noesgaard, S. S., & Ørngreen, R. (2015). The effectiveness of e-learning: An explorative and integrative review... The Electronic Journal of e-Learning, 13(4), 278–290.
+Link trực tiếp (Tạp chí EJEL, Open Access PDF): https://academic-publishing.org/index.php/ejel/article/view/1723(Hoặc link bài viết trên hệ thống ERIC: https://eric.ed.gov/?id=EJ1062121)
+8. Nunnally, J. C., & Bernstein, I. H. (1994). Psychometric theory (3rd ed.). McGraw-Hill.
+Lưu ý: Đây là sách giáo khoa hàn lâm.
+Google Books: [https://books.google.com/books/about/Psychometric_Theory.html?id=OEQoAQAAMAAJ](https://www.google.com/search?q=https://books.google.com/books/about/Psychometric_Theory.html%3Fid%3DOEQoAQAAMAAJ)
+9. Vygotsky, L. S. (1978). Mind in society: The development of higher psychological processes. Harvard University Press.
+Link Nhà xuất bản Harvard University Press: https://www.hup.harvard.edu/books/9780674576292
+(Bạn có thể đọc bản miễn phí trên kho lưu trữ JSTOR (cần tài khoản trường học) hoặc Archive.org).
+10. Wood, D., Bruner, J. S., & Ross, G. (1976). The role of tutoring in problem solving. Journal of Child Psychology and Psychiatry, 17(2), 89–100.
+DOI: https://doi.org/10.1111/j.1469-7610.1976.tb00381.x
+Link trực tiếp (Wiley Online Library): https://acamh.onlinelibrary.wiley.com/doi/10.1111/j.1469-7610.1976.tb00381.x
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-25T09:21:18+07:00.
+</ADDITIONAL_METADATA>
