@@ -6,13 +6,7 @@ import axios from 'axios';
 export const MODEL_NAME = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Bể chứa 5 API Keys được phân bổ để luân phiên và tự động cứu nguy khi chạm Rate Limit (429)
-export const GROQ_API_KEYS_POOL: string[] = [
-  import.meta.env.VITE_GROQ_API_KEY_1 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_2 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_3 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_4 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_5 || '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'
-].filter(Boolean);
+
 
 let activeKeyIndex = 0;
 
