@@ -1,10 +1,12 @@
-/**
+﻿/**
  * FMATH12 High-Performance Engine Connector
  * Kết nối tới Microservice Python tối ưu hoá hệ thống.
  * Cung cấp giải thuật chẩn đoán nhận thức cá nhân hoá & Scaffolding.
  */
 
-const PYTHON_ENGINE_URL = 'http://127.0.0.1:8000';
+// Dev: chạy python_engine local; Production (Vercel): Python Serverless Function cùng domain tại /api/*
+const PYTHON_ENGINE_URL = import.meta.env.VITE_PYTHON_ENGINE_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
+const HEALTH_TIMEOUT_MS = import.meta.env.DEV ? 350 : 2500;
 
 export interface CognitiveDiagnosticResult {
   weakestTopic: string;
@@ -55,7 +57,7 @@ export const fmathEngineService = {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 350);
+      const timeoutId = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
       const res = await fetch(`${PYTHON_ENGINE_URL}/api/health`, {
         signal: controller.signal
       });
@@ -78,7 +80,7 @@ export const fmathEngineService = {
     if (hasPython) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600);
+        const timeoutId = setTimeout(() => controller.abort(), import.meta.env.DEV ? 600 : 4000);
         const res = await fetch(`${PYTHON_ENGINE_URL}/api/personalized-eval`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

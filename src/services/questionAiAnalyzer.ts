@@ -1,4 +1,4 @@
-import { askGroqAI } from './groqAI';
+﻿import { askGroqAI } from './groqAI';
 import { CURRICULUM_PROMPT_TEXT } from '../config/curriculumFramework';
 import { supabase } from '../config/supabase';
 
@@ -81,8 +81,7 @@ BẮT BUỘC TRẢ VỀ DUY NHẤT 1 ĐỐI TƯỢNG JSON (không có markdown c
 
     try {
       const responseText = await askGroqAI(systemPrompt, prompt, true, undefined, {
-        isInternal: true,
-        model: 'llama-3.1-8b-instant'
+        isInternal: true
       });
       if (responseText) {
         let cleanText = responseText.trim();
@@ -261,7 +260,6 @@ ${q.correct_answer ? `Đáp án: ${typeof q.correct_answer === 'object' ? JSON.s
 
       try {
         const responseText = await askGroqAI(systemPrompt, promptItems, true, undefined, {
-          model: 'llama-3.1-8b-instant',
           isInternal: true
         });
         if (responseText) {
@@ -401,3 +399,4 @@ ${q.correct_answer ? `Đáp án: ${typeof q.correct_answer === 'object' ? JSON.s
     }
   }
 };
+

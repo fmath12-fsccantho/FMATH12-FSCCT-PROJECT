@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
 // ========================================================
 // CẤU HÌNH GROQ AI: MODEL & POOL 5 API KEYS (TỰ ĐỘNG FAILOVER)
@@ -7,20 +7,17 @@ export const MODEL_NAME = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120
 
 // Bể chứa 5 API Keys được phân bổ để luân phiên và tự động cứu nguy khi chạm Rate Limit (429)
 export const GROQ_API_KEYS_POOL: string[] = [
-  import.meta.env.VITE_GROQ_API_KEY_1 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_2 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_3 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_4 || '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',
-  import.meta.env.VITE_GROQ_API_KEY_5 || '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'
+  import.meta.env.VITE_GROQ_API_KEY_1 || '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',
+  import.meta.env.VITE_GROQ_API_KEY_2 || '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',
+  import.meta.env.VITE_GROQ_API_KEY_3 || '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',
+  import.meta.env.VITE_GROQ_API_KEY_4 || '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',
+  import.meta.env.VITE_GROQ_API_KEY_5 || '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'
 ].filter(Boolean);
 
 let activeKeyIndex = 0;
 
-// Các models dự phòng tốc độ cao & hạn ngạch token lớn (TPM lên tới 131k token/phút trên Groq)
-export const HIGH_THROUGHPUT_FALLBACK_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant'
-];
+// CHỈ DÙNG DUY NHẤT 1 MODEL: openai/gpt-oss-120b (không fallback sang model khác)
+const deadKeys = new Set<string>(); // key bị 401 -> bỏ qua ngay trong phiên
 
 export interface AskGroqOptions {
   model?: string;
@@ -53,6 +50,11 @@ export const FMATH_SECURITY_IDENTITY_PROMPT = `
      (Hệ thống FMATH12 Math Engine sẽ tự động dựng đồ thị hàm số chuẩn xác 100% từng pixel, đúng tuyệt đối hình dạng và các điểm cực trị).
    - Với hình học không gian Oxyz: Dùng khối mã \`\`\`svg ... \`\`\` với viewBox="0 0 400 240".
    - BẢNG BIẾN THIÊN / BẢNG XÉT DẤU: DÙNG BẢNG MARKDOWN chuẩn (ví dụ: | $x$ | $-\\infty$ | $x_0$ | $+\\infty$ |) kết hợp mũi tên KaTeX ($\\nearrow$, $\\searrow$).
+4. CHẤT LƯỢNG GIẢI TOÁN (BẮT BUỘC):
+   - Tự kiểm tra lại kết quả (thay ngược, điều kiện xác định) TRƯỚC khi trả lời; không bịa số liệu.
+   - Ngắn gọn, đúng trọng tâm: Hướng giải → Các bước đánh số → Đáp số in đậm. Không lặp lại đề, không lan man.
+   - Luôn trả lời tiếng Việt theo chuẩn GDPT 2018 lớp 12. Nếu yêu cầu JSON thì CHỈ trả JSON hợp lệ, không kèm giải thích/markdown.
+   - Nếu đề thiếu dữ kiện, nêu rõ phần thiếu thay vì đoán.
 ================================================================================`;
 
 /**
@@ -74,7 +76,7 @@ export const askGroqAI = async (
   chatHistory?: Array<{ role: string; content: string }>,
   options?: AskGroqOptions
 ): Promise<string> => {
-  const targetModel = options?.model || MODEL_NAME;
+  const targetModel = MODEL_NAME; // ép dùng 1 model duy nhất
   const isInternal = options?.isInternal ?? false;
 
   // Với tác vụ nội bộ (phân tích đề, phân loại JSON), bỏ qua prompt nhận diện cồng kềnh để tiết kiệm token
@@ -95,13 +97,7 @@ export const askGroqAI = async (
     messages.push({ role: "user", content: userMessage });
   }
 
-  // Danh sách model thử nghiệm (Nếu model chính bị 429 do rate limit tổ chức, tự động luân chuyển sang model có quota TPM cao hơn)
   const candidateModels = [targetModel];
-  HIGH_THROUGHPUT_FALLBACK_MODELS.forEach(m => {
-    if (!candidateModels.includes(m)) {
-      candidateModels.push(m);
-    }
-  });
 
   let lastError: any = null;
 
@@ -121,9 +117,11 @@ export const askGroqAI = async (
     }
 
     const maxKeyAttempts = GROQ_API_KEYS_POOL.length;
+    if (GROQ_API_KEYS_POOL.every(k => deadKeys.has(k))) break;
 
     for (let attempt = 0; attempt < maxKeyAttempts; attempt++) {
       const currentKey = getNextKey();
+      if (deadKeys.has(currentKey)) continue;
       const maskedKey = `${currentKey.substring(0, 8)}...${currentKey.slice(-4)}`;
 
       try {
@@ -135,7 +133,7 @@ export const askGroqAI = async (
               'Authorization': `Bearer ${currentKey}`,
               'Content-Type': 'application/json'
             },
-            timeout: 25000 // 25s timeout
+            timeout: 60000
           }
         );
 
@@ -152,6 +150,8 @@ export const askGroqAI = async (
         console.warn(
           `[Groq AI Failover] Model '${modelToUse}' - Key ${maskedKey} gặp lỗi (${statusCode || 'Network'}): ${errorMsg}. Đang luân chuyển...`
         );
+
+        if (statusCode === 401) { deadKeys.add(currentKey); continue; }
 
         // Nếu lỗi 429 và thông báo về TPM (Tokens Per Minute của Organization),
         // các keys khác trong cùng Org cũng sẽ bị cùng lỗi này trên model hiện tại.
@@ -170,5 +170,10 @@ export const askGroqAI = async (
   }
 
   console.error("Toàn bộ Groq API Keys & Models dự phòng đều gặp sự cố:", lastError?.response?.data || lastError?.message);
+  if (GROQ_API_KEYS_POOL.every(k => deadKeys.has(k))) throw new Error("API Key Groq không hợp lệ (401). Hãy cập nhật VITE_GROQ_API_KEY_* trong .env.local bằng key mới từ console.groq.com.");
   throw new Error("Hệ thống AI đang phản hồi chậm hoặc đang quá tải, vui lòng thử lại sau vài giây.");
 };
+
+
+
+
