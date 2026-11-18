@@ -46,7 +46,13 @@ const DashboardLayout = () => {
         setIsAuthenticated(true);
         setIsAuthChecking(false); // không chờ đồng bộ DB để tránh quay mãi
         try {
-          let profile = await studentService.getProfileByEmail(firebaseUser.email);
+          // Bảo vệ timeout 3.5s để nếu Supabase quá tải thì vẫn dùng tài khoản đã có, không bao giờ kẹt
+          let profile = currentUser?.email?.toLowerCase() === firebaseUser.email.toLowerCase() 
+            ? currentUser 
+            : await Promise.race([
+                studentService.getProfileByEmail(firebaseUser.email),
+                new Promise<any>(res => setTimeout(() => res(null), 3500))
+              ]).catch(() => null);
           let currentUserId = ''; 
           const userEmail = firebaseUser.email.toLowerCase();
           
