@@ -1,9 +1,0 @@
-﻿{
-  "functions": {
-    "api/index.py": { "includeFiles": "python_engine/**", "maxDuration": 10 }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
