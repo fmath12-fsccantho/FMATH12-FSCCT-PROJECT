@@ -144,13 +144,12 @@ const Dashboard = () => {
       if (!currentUser?.id) return;
       setIsLoading(true);
       try {
-        const curriculumData = await courseService.getCurriculum(currentUser.id);
+        const curriculumPromise = courseService.getCurriculum(currentUser.id);
+        const attemptsPromise = supabase.from('exam_attempts').select('*').eq('user_id', currentUser.id);
+        const curriculumData = await curriculumPromise;
         setChapters(curriculumData || []);
 
-        const attemptsResponse = await supabase
-          .from('exam_attempts')
-          .select('*')
-          .eq('user_id', currentUser.id);
+        const attemptsResponse = await attemptsPromise;
 
         let finalAttempts: any[] = [];
         if (attemptsResponse?.data && attemptsResponse.data.length > 0) {
@@ -178,8 +177,7 @@ const Dashboard = () => {
         setAttempts(finalAttempts);
 
         // Check Python Engine Health
-        const pyHealth = await fmathEngineService.checkHealth();
-        setIsPythonActive(pyHealth);
+        fmathEngineService.checkHealth().then(setIsPythonActive).catch(() => {});
 
       } catch (error) {
         console.error("Lỗi lấy dữ liệu học sinh:", error);

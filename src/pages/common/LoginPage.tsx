@@ -167,7 +167,7 @@ const LoginPage = () => {
     setIsFptStudent(false);
     switchRole(role);
 
-    try {
+    try {  await Promise.race([(async () => {
       const { data: existing } = await supabase.from('users').select('*').eq('email', cleanEmail).maybeSingle();
       if (existing) {
         if (cleanEmail === 'giaoviendemo.bgk@gmail.com' && existing.role !== 'teacher') {
@@ -213,7 +213,7 @@ const LoginPage = () => {
           school: computedSchool 
         });
       }
-    } catch (e) { 
+    })(), new Promise(res => setTimeout(res, 1200))]); } catch (e) { 
       console.warn('DB sync:', e); 
     }
 

@@ -44,6 +44,7 @@ const DashboardLayout = () => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         setIsAuthenticated(true);
+        setIsAuthChecking(false); // không chờ đồng bộ DB để tránh quay mãi
         try {
           let profile = await studentService.getProfileByEmail(firebaseUser.email);
           let currentUserId = ''; 
@@ -75,13 +76,18 @@ const DashboardLayout = () => {
               student_code: fallbackStudentCode 
             }).select().single();
 
-            if (error) console.error("Lỗi tạo người dùng mới:", error);
+            if (error) {
+              console.error("Lỗi tạo người dùng mới:", error);
+              // 409/23505: tài khoản đã được tạo song song (ở trang Login) -> lấy lại bản ghi hiện có
+              const existing = await studentService.getProfileByEmail(firebaseUser.email);
+              if (existing) { setUser(existing); currentUserId = existing.id; }
+            }
 
             if (data) { 
               setUser(data); 
               currentUserId = data.id; 
-            } else { 
-              currentUserId = firebaseUser.uid; 
+            } else if (!currentUserId) {
+              currentUserId = firebaseUser.uid;
             }
           }
 
