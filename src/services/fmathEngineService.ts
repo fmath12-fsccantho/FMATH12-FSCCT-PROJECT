@@ -50,6 +50,8 @@ export const fmathEngineService = {
    * Tăng tốc kiểm tra trạng thái Python Engine (non-blocking siêu tốc, cache 15s)
    */
   async checkHealth(): Promise<boolean> {
+    // Production không cấu hình engine riêng -> bỏ qua hoàn toàn, dùng tính toán TypeScript tức thì (không request, không chờ)
+    if (!import.meta.env.DEV && !import.meta.env.VITE_PYTHON_ENGINE_URL) return false;
     const now = Date.now();
     if (isEngineAvailable !== null && now - lastCheckTime < 15000) {
       return isEngineAvailable;

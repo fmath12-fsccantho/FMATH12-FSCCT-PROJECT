@@ -4,30 +4,12 @@ export const courseService = {
   /**
    * Lấy toàn bộ lộ trình học tập, kèm theo tiến độ của học sinh
    */
-  async getCurriculum(userId?: string) {
+  async getCurriculum(userId?: string, light = false) {
     try {
       // 1. Kéo toàn bộ Cấu trúc (Chương -> Bài học -> Bài tập)
       const { data: chapters, error } = await supabase
         .from('chapters')
-        .select(`
-          id,
-          title,
-          sort_order,
-          lessons (
-            id,
-            title,
-            theory_content,
-            sort_order,
-            exercises (
-              id,
-              content,
-              options,
-              correct_answer,
-              explanation,
-              sort_order
-            )
-          )
-        `)
+        .select(light ? `id, title, sort_order, lessons ( id, title, sort_order )` : `id, title, sort_order, lessons ( id, title, theory_content, sort_order, exercises ( id, content, options, correct_answer, explanation, sort_order ) )`)
         .order('sort_order', { ascending: true });
 
       if (error) {

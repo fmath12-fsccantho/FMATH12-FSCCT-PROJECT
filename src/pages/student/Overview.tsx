@@ -144,7 +144,7 @@ const Dashboard = () => {
       if (!currentUser?.id) return;
       setIsLoading(true);
       try {
-        const curriculumPromise = courseService.getCurriculum(currentUser.id);
+        const curriculumPromise = courseService.getCurriculum(currentUser.id, true);
         const attemptsPromise = supabase.from('exam_attempts').select('*').eq('user_id', currentUser.id);
         const curriculumData = await curriculumPromise;
         setChapters(curriculumData || []);
@@ -373,14 +373,17 @@ Trả về định dạng JSON thuần túy (không markdown block):
   };
 
   useEffect(() => {
-    if (skills.length > 0) {
+    if (skills.length === 0) return;
+    // Trì hoãn gọi AI để giao diện và dữ liệu hiện trước, không tranh băng thông lúc tải trang
+    const timer = setTimeout(() => {
       if (!aiTutorMessage) {
         generateAiPersonalization(skills);
       }
       if (!aiDiagnosticAssessment || !aiCurriculumAssessment) {
         generateComprehensiveAiAssessments(skills, attempts);
       }
-    }
+    }, 3000);
+    return () => clearTimeout(timer);
   }, [skills.length, attempts.length]);
 
   // Sinh 2 đánh giá tổng quan AI chuyên sâu: Năng lực cá nhân & Bản đồ kiến thức 2018
