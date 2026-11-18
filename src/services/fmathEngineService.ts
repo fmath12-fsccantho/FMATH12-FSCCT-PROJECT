@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FMATH12 High-Performance Engine Connector
  * Kết nối tới Microservice Python tối ưu hoá hệ thống.
  * Cung cấp giải thuật chẩn đoán nhận thức cá nhân hoá & Scaffolding.

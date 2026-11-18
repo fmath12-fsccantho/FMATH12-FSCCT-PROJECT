@@ -1,4 +1,4 @@
-﻿import { askGroqAI } from './groqAI';
+import { askGroqAI } from './groqAI';
 import { CURRICULUM_PROMPT_TEXT } from '../config/curriculumFramework';
 import { supabase } from '../config/supabase';
 

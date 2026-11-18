@@ -1,4 +1,4 @@
-﻿"""Vercel Python Serverless Function - tự kích hoạt khi deploy (thư mục /api).
+"""Vercel Python Serverless Function - tự kích hoạt khi deploy (thư mục /api).
 Dùng lại handler của python_engine/fmath_engine.py (chỉ dùng thư viện chuẩn)."""
 import os
 import sys
